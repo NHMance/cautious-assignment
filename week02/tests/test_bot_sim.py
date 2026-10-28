@@ -93,3 +93,88 @@ def test_risk_block_is_recorded(tmp_path):
     blocks = {r["check"] for r in records if r["type"] == "RISK_BLOCK"}
     assert blocks == {"1_MAX_LOSS", "2_NOTIONAL"}
     assert not any(r["type"] == "ORDER_SUBMIT" for r in records)
+
+
+# ── 멈춘 까닭이 기록에 남는지 ─────────────────────────────────
+
+
+def run_stopped(tmp_path, bars, *, stop_at: str, stop):
+    """`stop_at` 시각 이후 첫 봉 조회에서 `stop()` 을 부릅니다. 기록과, 밖으로 나온 예외를 돌려줍니다."""
+    clock = SimClock(datetime(2026, 10, 28, 8, 55, tzinfo=KST))
+    market = FakeMarket(bars, lambda now: 100.0)
+    market.clock = clock
+    plain = market.get_bars_5m
+
+    def get_bars_5m(today, now):
+        if now >= at(DAY, stop_at):
+            stop()
+        return plain(today, now)
+
+    market.get_bars_5m = get_bars_5m
+    journal = Journal("TEST", clock=clock, root=tmp_path, echo=False)
+    bot = Bot(symbol="TEST", market=market, broker=FakeBroker("TEST", journal, clock, dry_run=True),
+              journal=journal, clock=clock, environment="test", day=DAY)
+    escaped = None
+    try:
+        bot.run()
+    except BaseException as exc:  # noqa: BLE001 — 무엇이 밖으로 나오는지 봅니다
+        escaped = exc
+    lines = (tmp_path / "journal_20261028.jsonl").read_text(encoding="utf-8").splitlines()
+    return [json.loads(line) for line in lines], escaped
+
+
+def test_deadline_end_has_stop_reason(tmp_path):
+    records = run(tmp_path, range_bars(), lambda now: 100.0)
+    end = records[-1]
+    assert end["type"] == "RUN_END" and end["stop_reason"] == "DEADLINE"
+
+
+def test_ctrl_c_is_recorded(tmp_path):
+    def ctrl_c():
+        raise KeyboardInterrupt
+
+    records, escaped = run_stopped(tmp_path, range_bars(), stop_at="09:10", stop=ctrl_c)
+    end = records[-1]
+    assert escaped is None
+    assert end["type"] == "RUN_END" and end["interrupted"] is True
+    assert end["stop_reason"] == "CTRL_C" and end["stop_detail"]
+
+
+def test_terminal_closed_signal_is_recorded(tmp_path):
+    import os
+    import signal
+
+    before = signal.getsignal(signal.SIGTERM)
+    records, escaped = run_stopped(tmp_path, range_bars(), stop_at="09:10",
+                                   stop=lambda: os.kill(os.getpid(), signal.SIGTERM))
+    end = records[-1]
+    assert escaped is None
+    assert end["type"] == "RUN_END" and end["stop_reason"] == "SIGTERM"
+    assert signal.getsignal(signal.SIGTERM) is before  # 돌려놓았는지
+
+
+def test_crash_is_recorded_with_error(tmp_path):
+    def broken():
+        raise RuntimeError("예상 못 한 고장")
+
+    # 봉 조회 오류는 기록하고 이어 가므로, 이어 가지 못하는 자리(상태 머신)를 고장 냅니다.
+    import bot.main as main_module
+
+    original = main_module.Strategy.on_bars
+
+    def on_bars(self, bars, now):
+        if now >= at(DAY, "09:10"):
+            broken()
+        return original(self, bars, now)
+
+    main_module.Strategy.on_bars = on_bars
+    try:
+        records, escaped = run_stopped(tmp_path, range_bars(), stop_at="23:59", stop=lambda: None)
+    finally:
+        main_module.Strategy.on_bars = original
+    assert isinstance(escaped, RuntimeError)
+    crash = next(r for r in records if r["type"] == "ERROR" and r["code"] == "CRASH")
+    assert "예상 못 한 고장" in crash["message"] and "RuntimeError" in crash["message"]
+    end = records[-1]
+    assert end["type"] == "RUN_END" and end["stop_reason"] == "CRASH"
+    assert "예상 못 한 고장" in end["stop_detail"]

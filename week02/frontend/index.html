@@ -57,7 +57,7 @@
   th, td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
   th:first-child, td:first-child { text-align: left; }
   th { color: var(--muted); font-weight: 500; font-size: 12px; }
-  .pos { color: var(--up); } .neg { color: var(--down); }
+  .pos { color: var(--up); } .neg { color: var(--down); } .err { color: var(--err); }
   .empty { color: var(--muted); text-align: center; padding: 18px; }
 
   aside { display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--line); background: var(--panel); }
@@ -185,8 +185,22 @@ async function poll() {
 }
 
 // ── 기록 → 화면 상태 ───────────────────────────────────
+// RUN_END.stop_reason → 화면 문구. 예전 기록(stop_reason 없음)은 interrupted 로만 짐작합니다.
+const STOP_TEXT = {
+  DEADLINE: "15:20 정상 종료",
+  CTRL_C: "Ctrl+C 로 중단",
+  SIGTERM: "종료 신호(kill)로 중단",
+  SIGHUP: "터미널 창이 닫혀 중단",
+  CRASH: "오류로 중단",
+};
+function stopOf(e) {
+  if (e.stop_reason) return { reason: e.stop_reason, text: STOP_TEXT[e.stop_reason] || e.stop_reason, detail: e.stop_detail || "" };
+  return e.interrupted ? { reason: "UNKNOWN", text: "중단됨 (사유를 남기기 전 버전의 기록)", detail: "" }
+                       : { reason: "DEADLINE", text: "종료", detail: "" };
+}
+
 function derive() {
-  const s = { state: "–", H: null, L: null, position: null, entries: 0, trades: [], bars: [], marks: [], errors: 0, blocks: 0, last: null, done: null };
+  const s = { state: "–", H: null, L: null, position: null, entries: 0, trades: [], bars: [], marks: [], errors: 0, blocks: 0, last: null, done: null, stop: null };
   for (const e of events) {
     s.state = e.state || s.state;
     s.last = e.ts;
@@ -201,7 +215,8 @@ function derive() {
       case "ERROR": s.errors += 1; break;
       case "RISK_BLOCK": s.blocks += 1; break;
       case "DONE": s.done = e.reason; break;
-      case "RUN_END": s.H = e.H ?? s.H; s.L = e.L ?? s.L; s.entries = e.entries ?? s.entries; break;
+      case "RUN_START": s.stop = null; break;   // 같은 날 다시 켜면 앞 실행의 멈춘 사유는 지웁니다
+      case "RUN_END": s.H = e.H ?? s.H; s.L = e.L ?? s.L; s.entries = e.entries ?? s.entries; s.stop = stopOf(e); break;
     }
   }
   return s;
@@ -209,9 +224,11 @@ function derive() {
 
 function render(appended = false) {
   const live = (meta?.mode ?? mode) === "live";
+  const s = derive();
+  const stopped = s.stop && s.stop.reason !== "DEADLINE";
   $("badge").innerHTML = !meta ? "" :
     `<span class="badge ${live ? "live" : "replay"}"><span class="dot ${meta.running ? "pulse" : ""}"></span>` +
-    `${live ? (meta.dry_run ? "실시간 모의 · DRY_RUN" : "실시간 모의 트레이딩") : "리플레이 (과거 데이터)"}${meta.running ? " · 진행 중" : " · 종료"}</span>`;
+    `${live ? (meta.dry_run ? "실시간 모의 · DRY_RUN" : "실시간 모의 트레이딩") : "리플레이 (과거 데이터)"}${meta.running ? " · 진행 중" : ` · ${s.stop ? s.stop.text : "종료"}`}</span>`;
   const banner = $("banner");
   banner.className = `banner ${live ? "live" : "replay"}`;
   banner.textContent = !meta
@@ -221,12 +238,13 @@ function render(appended = false) {
     : live ? `모의계좌로 실제 주문이 나가는 기록입니다 (environment=paper). summarize.py 가 세는 기록입니다.`
     : `지난 하루의 실제 분봉으로 주문 없이 돌린 기록입니다 (--replay-date). 현재가는 1분봉 종가, 체결가는 그 현재가로 가정했고, summarize.py 집계에서 빠집니다.`;
 
-  const s = derive();
   const pnl = s.trades.reduce((a, t) => a + (t.pnl_net_krw ?? t.pnl_krw ?? 0), 0);
   const ticks = s.trades.reduce((a, t) => a + (t.ticks ?? 0), 0);
   const p = s.position;
   const cards = [
     ["상태", s.state + (s.done ? ` (${s.done})` : "")],
+    ["멈춘 사유", meta?.running || !s.stop ? "–"
+      : `<span class="${stopped ? "err" : ""}">${esc(s.stop.text)}</span>${s.stop.detail ? `<div class="sub">${esc(s.stop.detail)}</div>` : ""}`],
     ["기준 구간 H / L", s.H == null ? "–" : `${fmt(s.H)} / ${fmt(s.L)}`],
     ["포지션", p ? `<span class="${p.side === "LONG" ? "pos" : "neg"}">${p.side} ${p.qty}</span> @ ${fmt(p.avg_price)}` : "없음"],
     ["손절 / 익절", p?.stop ? `${fmt(p.stop)} / ${fmt(p.take)}` : "–"],
@@ -305,7 +323,7 @@ function summary(e) {
   const b = e.bar;
   switch (e.type) {
     case "RUN_START": return `environment=${e.environment} · dry_run=${e.dry_run}`;
-    case "RUN_END": return `진입 ${e.entries}회 · 사유 ${e.done_reason ?? "–"}${e.interrupted ? " · 중단됨" : ""}`;
+    case "RUN_END": { const st = stopOf(e); return `${st.text}${st.detail ? ` (${st.detail})` : ""} · 진입 ${e.entries}회 · 당일 종료 사유 ${e.done_reason ?? "–"}`; }
     case "RECOVER": return `진입 ${e.entries_today}회 · 포지션 ${e.position ? `${e.position.side} ${e.position.qty}` : "없음"} · 미체결 ${e.pending_orders}`;
     case "BAR": return `${b.start}~${b.end}  O ${fmt(b.open)} H ${fmt(b.high)} L ${fmt(b.low)} C ${fmt(b.close)}  V ${fmt(b.volume)}`;
     case "RANGE_SET": return `H ${fmt(e.H)} / L ${fmt(e.L)}`;

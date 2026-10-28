@@ -18,7 +18,9 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import signal
 import sys
+import traceback
 from dataclasses import asdict, dataclass
 from datetime import date, datetime, timedelta
 from typing import Any
@@ -29,6 +31,29 @@ from bot.journal import RESULTS_DIR, Journal
 from bot.strategy import LONG, SHORT, Action, State, Strategy
 
 STOP, TAKE, FORCE = "STOP", "TAKE", "FORCE"
+
+# RUN_END.stop_reason — 봇이 멈춘 까닭.
+STOP_REASONS = {
+    "DEADLINE": "15:20 정상 종료",
+    "CTRL_C": "Ctrl+C 로 중단",
+    "SIGTERM": "종료 신호(kill)로 중단",
+    "SIGHUP": "터미널 창이 닫혀 중단",
+    "CRASH": "예상하지 못한 오류로 중단",
+}
+# 이 신호가 오면 기록을 남기고 멈춥니다. 그냥 두면 RUN_END 없이 죽어 화면에 「진행 중」으로 남습니다.
+_STOP_SIGNALS = tuple(s for s in (getattr(signal, "SIGTERM", None), getattr(signal, "SIGHUP", None)) if s)
+
+
+class StopSignal(BaseException):
+    """종료 신호. `Exception` 이 아니어야 루프 안의 「기록하고 이어 가기」에 삼켜지지 않습니다."""
+
+    def __init__(self, name: str) -> None:
+        super().__init__(name)
+        self.name = name
+
+
+def _raise_stop(signum: int, _frame: Any) -> None:
+    raise StopSignal(signal.Signals(signum).name)
 
 
 @dataclass
@@ -90,6 +115,8 @@ class Bot:
         self.journal.write("RUN_START", environment=self.environment, dry_run=self.broker.dry_run,
                            settings=settings.snapshot())
         interrupted = False
+        stop_reason, stop_detail = "DEADLINE", None
+        previous = self._catch_stop_signals()
         try:
             self.recover()
             next_fetch = self.clock.now()
@@ -111,18 +138,63 @@ class Bot:
                 self.clock.sleep(max(wait, 0.0))
         except KeyboardInterrupt:
             interrupted = True
-            held = self._safe_position()
-            msg = f"보유 중: {held.side} {held.qty}계약 — 자동 청산하지 않습니다. 직접 확인하세요!" if held else "보유 포지션 없음"
-            print(f"\n[Ctrl+C] {msg}", flush=True)
+            stop_reason, stop_detail = "CTRL_C", "사용자가 Ctrl+C 를 눌렀습니다"
+        except StopSignal as exc:
+            interrupted = True
+            stop_reason, stop_detail = exc.name, f"{exc.name} 신호를 받았습니다"
+        except Exception as exc:
+            # 루프 안에서 기록하고 이어 가는 오류(API 등)가 아닌 것. 기록을 남기고 그대로 밖으로 내보냅니다.
+            stop_reason, stop_detail = "CRASH", f"{type(exc).__name__}: {exc}"
+            self._safe_write("ERROR", api="bot", code="CRASH", message=stop_detail,
+                             traceback=traceback.format_exc(limit=6))
+            raise
         finally:
-            if not interrupted and self.trade is not None:
+            self._restore_stop_signals(previous)
+            if stop_reason != "DEADLINE":
+                held = self._safe_position()
+                msg = f"보유 중: {held.side} {held.qty}계약 — 자동 청산하지 않습니다. 직접 확인하세요!" if held else "보유 포지션 없음"
+                self._say(f"\n[중단] {STOP_REASONS[stop_reason]} ({stop_detail}). {msg}")
+            if stop_reason == "DEADLINE" and self.trade is not None:
                 self.journal.write("ERROR", api="bot", code="POSITION_LEFT",
                                    message="15:20 까지 청산을 확인하지 못했습니다", trade=asdict(self.trade))
             held = self._safe_position()
-            self.journal.write("RUN_END", environment=self.environment, dry_run=self.broker.dry_run,
-                               interrupted=interrupted, entries=self.strategy.entries,
-                               position=asdict(held) if held else None, done_reason=self.strategy.done_reason,
-                               H=self.strategy.high, L=self.strategy.low, settings=settings.snapshot())
+            self._safe_write("RUN_END", environment=self.environment, dry_run=self.broker.dry_run,
+                             interrupted=interrupted, stop_reason=stop_reason, stop_detail=stop_detail,
+                             entries=self.strategy.entries,
+                             position=asdict(held) if held else None, done_reason=self.strategy.done_reason,
+                             H=self.strategy.high, L=self.strategy.low, settings=settings.snapshot())
+
+    # ── 멈출 때 ─────────────────────────────────────────────
+
+    @staticmethod
+    def _catch_stop_signals() -> dict[int, Any]:
+        """SIGTERM·SIGHUP 을 StopSignal 로 바꿉니다. 돌려놓을 수 있게 전의 처리기를 돌려줍니다."""
+        previous: dict[int, Any] = {}
+        for sig in _STOP_SIGNALS:
+            try:
+                previous[sig] = signal.signal(sig, _raise_stop)
+            except ValueError:  # 주 스레드가 아니면 신호를 받을 수 없습니다
+                break
+        return previous
+
+    @staticmethod
+    def _restore_stop_signals(previous: dict[int, Any]) -> None:
+        for sig, handler in previous.items():
+            signal.signal(sig, handler)
+
+    def _safe_write(self, type_: str, **fields: Any) -> None:
+        """멈추는 길에서 쓰는 기록. 터미널이 닫혀 화면 출력이 실패해도 파일 기록은 남기고 넘어갑니다."""
+        try:
+            self.journal.write(type_, **fields)
+        except OSError:
+            pass
+
+    @staticmethod
+    def _say(text: str) -> None:
+        try:
+            print(text, flush=True)
+        except OSError:  # 터미널이 이미 닫혔습니다
+            pass
 
     def _next_fetch(self, now: datetime) -> datetime:
         delay = timedelta(seconds=settings.BAR_FETCH_DELAY_SEC)

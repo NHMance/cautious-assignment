@@ -226,7 +226,10 @@ uv run python -m bot.main --symbol A116C000   # 다른 종목코드로 (settings
 
 #### 2-5-3. 중단·재시작
 
-- **`Ctrl+C`**: 보유 포지션 여부를 출력하고 `RUN_END interrupted=true` 를 남깁니다. **자동 청산하지 않으므로** 보유 중이라는 경고가 나오면 HTS/앱에서 직접 확인합니다.
+- **`Ctrl+C`·터미널 창 닫기·`kill`**: 멈춘 까닭과 보유 포지션 여부를 출력하고 `RUN_END interrupted=true stop_reason=CTRL_C/SIGHUP/SIGTERM` 을 남깁니다.
+  **자동 청산하지 않으므로** 보유 중이라는 경고가 나오면 HTS/앱에서 직접 확인합니다.
+- **예상 못 한 오류**: `ERROR code=CRASH`(오류 내용·traceback)와 `RUN_END stop_reason=CRASH` 를 남기고 멈춥니다. API 조회 오류는 이와 달리 기록만 하고 계속 돕니다.
+- 대시보드의 「멈춘 사유」 카드와 배지에 위 사유가 나옵니다.
 - **다시 실행**: 같은 날 다시 `uv run python -m bot.main` 하면 오늘 journal 에서 진입 횟수를, `open_interest()` 에서 보유 포지션을 되살려 이어 갑니다.
   보유가 있으면 잔고 평균가 기준으로 손절·익절가를 다시 세웁니다. 지난 봉에서 생긴 신호로는 주문하지 않습니다(`CONFIRM_OK reason=STALE`).
 
@@ -374,7 +377,8 @@ uv run --group dashboard uvicorn frontend.app:app --port 8000   # → http://127
 
 | type | 담긴 것 |
 | --- | --- |
-| `RUN_START` / `RUN_END` | 설정 스냅샷 전체, 환경(paper/replay/bot-test), DRY_RUN 여부 / 종료 시 보유·진입 횟수·H/L |
+| `RUN_START` / `RUN_END` | 설정 스냅샷 전체, 환경(paper/replay/bot-test), DRY_RUN 여부 / 종료 시 보유·진입 횟수·H/L, **멈춘 사유** `stop_reason`(`DEADLINE` 15:20 정상 · `CTRL_C` · `SIGHUP` 터미널 닫힘 · `SIGTERM` kill · `CRASH` 오류)과 `stop_detail` |
+| `ERROR` `code=CRASH` | 루프가 이어 갈 수 없는 예상 못 한 오류. 오류 종류·내용과 traceback 을 남기고 봇은 멈춥니다 |
 | `RECOVER` | 시작 시 복구한 진입 횟수·보유·미체결 |
 | `BAR` | 확정봉 OHLCV |
 | `RANGE_SET` | H, L, 사용한 봉 4개 |
