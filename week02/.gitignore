@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+# 인증 정보는 Git 에 넣지 않습니다 (.env 또는 ~/NHFutures/config/config.yaml).
+.env
+.env.*
+!.env.example
+config.yaml

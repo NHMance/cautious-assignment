@@ -1,0 +1,23 @@
+{
+ "api_id": "domestic_price",
+ "collected_at": "2026-10-27T00:00:00+00:00",
+ "environment": "paper",
+ "format": "nh-fixture-1",
+ "http_status": 200,
+ "market": "domestic",
+ "method": "POST",
+ "path": "/trade/v1/domestic/price",
+ "record_id": "MOCK_02_price",
+ "request": {
+  "sym": "A116B000"
+ },
+ "response": {
+  "sym_exch": "A116B000",
+  "sym_nm": "삼성전자 F 202611 (목업)",
+  "last_pric": "226500.00"
+ },
+ "scenario_id": "domestic_price__mock",
+ "status": "response_received",
+ "test_group": "봇테스트_목업",
+ "transport": "HTTP"
+}

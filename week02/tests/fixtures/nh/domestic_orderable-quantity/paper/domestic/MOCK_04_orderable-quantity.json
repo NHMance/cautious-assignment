@@ -1,0 +1,26 @@
+{
+ "api_id": "domestic_orderable-quantity",
+ "collected_at": "2026-10-27T00:00:00+00:00",
+ "environment": "paper",
+ "format": "nh-fixture-1",
+ "http_status": 200,
+ "market": "domestic",
+ "method": "POST",
+ "path": "/trade/v1/domestic/orderable-quantity",
+ "record_id": "MOCK_04_orderable-quantity",
+ "request": {
+  "ord_sts": "1",
+  "rt_tp": "2",
+  "sym": "A116B000",
+  "trd_div": "1",
+  "ord_pric": "226500"
+ },
+ "response": {
+  "ord_psb_qty": "1",
+  "tot_psb_qty": "1"
+ },
+ "scenario_id": "domestic_orderable-quantity__mock",
+ "status": "response_received",
+ "test_group": "봇테스트_목업",
+ "transport": "HTTP"
+}

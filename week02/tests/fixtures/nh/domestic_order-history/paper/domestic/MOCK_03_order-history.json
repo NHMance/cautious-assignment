@@ -1,0 +1,26 @@
+{
+ "api_id": "domestic_order-history",
+ "collected_at": "2026-10-27T00:00:00+00:00",
+ "environment": "paper",
+ "format": "nh-fixture-1",
+ "http_status": 200,
+ "market": "domestic",
+ "method": "POST",
+ "path": "/trade/v1/domestic/order-history",
+ "record_id": "MOCK_03_order-history",
+ "request": {
+  "exec_div": "2",
+  "trd_div": "0",
+  "trd_tm_div_cd": "1",
+  "ord_div_cd": "0",
+  "nxt_key": ""
+ },
+ "response": {
+  "nrec": "0000",
+  "nxt_key": ""
+ },
+ "scenario_id": "domestic_order-history__mock",
+ "status": "response_received",
+ "test_group": "봇테스트_목업",
+ "transport": "HTTP"
+}

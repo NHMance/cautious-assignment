@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ORB 재확인 대시보드</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --panel: #ffffff; --line: #e3e6eb; --text: #1b1f24; --muted: #6b7280;
+    --up: #d63b3b; --down: #2463d1; --accent: #0f766e;
+    --live: #c2410c; --live-bg: #fff1e8; --rep: #4338ca; --rep-bg: #eef0ff;
+    --warn: #b45309; --err: #b91c1c; --ok: #15803d;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115; --panel: #171a21; --line: #2a2f3a; --text: #e6e8ec; --muted: #8b93a3;
+      --up: #f26b6b; --down: #5b8def; --accent: #2dd4bf;
+      --live: #fb923c; --live-bg: #2a1a10; --rep: #a5b4fc; --rep-bg: #1c1f3a;
+      --warn: #fbbf24; --err: #f87171; --ok: #4ade80;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--bg); color: var(--text); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Segoe UI", sans-serif; }
+
+  .app { display: grid; grid-template-rows: auto 1fr; height: 100vh; }
+  header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 16px; margin: 0 8px 0 0; }
+  .tabs { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .tabs button { border: 0; background: transparent; color: var(--muted); padding: 6px 12px; font: inherit; cursor: pointer; }
+  .tabs button.on { background: var(--text); color: var(--panel); }
+  select { font: inherit; padding: 5px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--text); }
+  .spacer { flex: 1; }
+  .badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-weight: 600; font-size: 13px; }
+  .badge.live { color: var(--live); background: var(--live-bg); border: 1px solid var(--live); }
+  .badge.replay { color: var(--rep); background: var(--rep-bg); border: 1px solid var(--rep); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+  .dot.pulse { animation: pulse 1.2s infinite; }
+  @keyframes pulse { 50% { opacity: .25; } }
+  .sub { color: var(--muted); font-size: 12px; }
+
+  .body { display: grid; grid-template-columns: minmax(0, 1fr) 440px; min-height: 0; }
+  main { overflow: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+  .banner { padding: 10px 14px; border-radius: 8px; font-size: 13px; }
+  .banner.live { background: var(--live-bg); color: var(--live); border-left: 4px solid var(--live); }
+  .banner.replay { background: var(--rep-bg); color: var(--rep); border-left: 4px solid var(--rep); }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .card .k { color: var(--muted); font-size: 12px; }
+  .card .v { font-size: 18px; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+  .panel h2 { font-size: 13px; margin: 0 0 8px; color: var(--muted); font-weight: 600; }
+  #chart { width: 100%; height: 320px; display: block; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; }
+  .pos { color: var(--up); } .neg { color: var(--down); }
+  .empty { color: var(--muted); text-align: center; padding: 18px; }
+
+  aside { display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--line); background: var(--panel); }
+  .logbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  .logbar h2 { margin: 0; font-size: 14px; }
+  .logbar input[type=search] { flex: 1; min-width: 120px; font: inherit; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+  .logbar label { font-size: 12px; color: var(--muted); display: inline-flex; gap: 4px; align-items: center; }
+  #log { flex: 1; overflow: auto; font-family: var(--mono); font-size: 12px; }
+  .row { padding: 5px 12px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .row:hover { background: var(--bg); }
+  .row .t { color: var(--muted); margin-right: 6px; }
+  .chip { display: inline-block; min-width: 92px; padding: 0 6px; border-radius: 4px; font-weight: 600; margin-right: 6px; text-align: center; }
+  .row pre { margin: 6px 0 2px; white-space: pre-wrap; word-break: break-all; color: var(--muted); }
+  .c-run { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+  .c-bar { color: var(--muted); border: 1px solid var(--line); }
+  .c-sig { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+  .c-ord { background: color-mix(in srgb, var(--rep) 18%, transparent); color: var(--rep); }
+  .c-ok { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
+  .c-err { background: color-mix(in srgb, var(--err) 20%, transparent); color: var(--err); }
+  .logfoot { padding: 6px 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+
+  @media (max-width: 900px) {
+    .app { height: auto; }
+    .body { grid-template-columns: 1fr; }
+    aside { border-left: 0; border-top: 1px solid var(--line); height: 70vh; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>ORB 재확인 대시보드</h1>
+    <div class="tabs" id="tabs">
+      <button data-mode="live">실시간 모의</button>
+      <button data-mode="replay">리플레이</button>
+    </div>
+    <select id="file"></select>
+    <span class="spacer"></span>
+    <span id="badge"></span>
+    <span class="sub" id="updated"></span>
+  </header>
+
+  <div class="body">
+    <main>
+      <div id="banner" class="banner"></div>
+      <div class="cards" id="cards"></div>
+      <div class="panel">
+        <h2>5분봉 · 기준 구간 H/L · 진입·청산</h2>
+        <svg id="chart"></svg>
+      </div>
+      <div class="panel">
+        <h2>거래 내역</h2>
+        <table id="trades"></table>
+      </div>
+    </main>
+
+    <aside>
+      <div class="logbar">
+        <h2>로그</h2>
+        <input type="search" id="q" placeholder="type·내용 검색">
+        <label><input type="checkbox" id="hideBar" checked>봉 숨기기</label>
+        <label><input type="checkbox" id="follow" checked>자동 스크롤</label>
+      </div>
+      <div id="log"></div>
+      <div class="logfoot" id="logfoot"></div>
+    </aside>
+  </div>
+</div>
+
+<script>
+const POLL_MS = 2000;
+const $ = (id) => document.getElementById(id);
+const fmt = (n) => n == null ? "–" : Number(n).toLocaleString("ko-KR");
+const hms = (ts) => (ts || "").slice(11, 19);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+let mode = null;             // "live" | "replay". 처음엔 기록이 있는 쪽(실시간 우선)으로 엽니다.
+try { mode = localStorage.getItem("mode"); } catch {}
+if (mode !== "live" && mode !== "replay") mode = null;
+let files = [];
+let current = null;          // 지금 보고 있는 저널 이름
+let events = [];             // 그 저널의 모든 줄
+let meta = null;
+let polling = false;
+
+// ── 저널 목록 ─────────────────────────────────────────
+async function loadFiles() {
+  files = await (await fetch("/api/journals")).json();
+  if (!mode) mode = files.some((f) => f.mode === "live") || !files.length ? "live" : "replay";
+  const shown = files.filter((f) => f.mode === mode)
+                     .sort((a, b) => b.day.localeCompare(a.day));
+  const sel = $("file");
+  sel.innerHTML = shown.map((f) =>
+    `<option value="${esc(f.name)}">${f.day} · ${esc(f.symbol)}${f.mode === "live" ? (f.dry_run ? " · DRY_RUN" : " · 실주문") : ""}${f.running ? " · 진행 중" : ""}</option>`
+  ).join("") || `<option value="">기록 없음</option>`;
+  if (!shown.some((f) => f.name === current)) {
+    current = shown[0]?.name || null;
+    events = []; meta = null;
+  }
+  sel.value = current || "";
+  document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("on", b.dataset.mode === mode));
+}
+
+// ── 새 줄만 이어 받기 ──────────────────────────────────
+async function poll() {
+  if (polling) return;
+  polling = true;
+  try {
+    await loadFiles();
+    if (!current) { events = []; meta = null; render(); return; }
+    const name = current;
+    const res = await fetch(`/api/journal?file=${encodeURIComponent(name)}&after=${events.length}`);
+    if (!res.ok || name !== current) return;
+    const data = await res.json();
+    if (data.total < events.length) events = [];   // 파일이 새로 쓰였으면 처음부터
+    events.push(...data.events);
+    meta = data.meta;
+    $("updated").textContent = `갱신 ${new Date().toLocaleTimeString("ko-KR", { hour12: false })}`;
+    render(data.events.length > 0);
+  } catch (e) {
+    $("updated").textContent = "서버 연결 끊김";
+  } finally {
+    polling = false;
+  }
+}
+
+// ── 기록 → 화면 상태 ───────────────────────────────────
+function derive() {
+  const s = { state: "–", H: null, L: null, position: null, entries: 0, trades: [], bars: [], marks: [], errors: 0, blocks: 0, last: null, done: null };
+  for (const e of events) {
+    s.state = e.state || s.state;
+    s.last = e.ts;
+    switch (e.type) {
+      case "BAR": s.bars.push(e.bar); break;
+      case "RANGE_SET": s.H = e.H; s.L = e.L; break;
+      case "RECOVER": s.entries = e.entries_today ?? s.entries; s.position = e.position; break;
+      case "ENTRY_OPEN": s.entries += 1;
+        s.position = { side: e.trade.side, qty: e.trade.qty, avg_price: e.trade.entry_price, ...(e.position || {}), stop: e.trade.stop, take: e.trade.take }; break;
+      case "FILL": s.marks.push({ ts: e.ts, role: e.role, side: e.side, price: e.price }); break;
+      case "TRADE_CLOSED": s.trades.push(e); s.position = null; break;
+      case "ERROR": s.errors += 1; break;
+      case "RISK_BLOCK": s.blocks += 1; break;
+      case "DONE": s.done = e.reason; break;
+      case "RUN_END": s.H = e.H ?? s.H; s.L = e.L ?? s.L; s.entries = e.entries ?? s.entries; break;
+    }
+  }
+  return s;
+}
+
+function render(appended = false) {
+  const live = (meta?.mode ?? mode) === "live";
+  $("badge").innerHTML = !meta ? "" :
+    `<span class="badge ${live ? "live" : "replay"}"><span class="dot ${meta.running ? "pulse" : ""}"></span>` +
+    `${live ? (meta.dry_run ? "실시간 모의 · DRY_RUN" : "실시간 모의 트레이딩") : "리플레이 (과거 데이터)"}${meta.running ? " · 진행 중" : " · 종료"}</span>`;
+  const banner = $("banner");
+  banner.className = `banner ${live ? "live" : "replay"}`;
+  banner.textContent = !meta
+    ? (live ? "실시간 모의 트레이딩 기록이 없습니다. 장중에 uv run python -m bot.main 으로 봇을 돌리면 여기에 나옵니다."
+            : "리플레이 기록이 없습니다. uv run python -m bot.main --replay-date YYYYMMDD 로 돌리면 여기에 나옵니다.")
+    : live && meta.dry_run ? `실시간 시세로 돌지만 주문은 보내지 않은 기록입니다 (--dry-run, results/dry-run/). 체결가는 그 순간 현재가로 가정했고, summarize.py 집계에서 빠집니다.`
+    : live ? `모의계좌로 실제 주문이 나가는 기록입니다 (environment=paper). summarize.py 가 세는 기록입니다.`
+    : `지난 하루의 실제 분봉으로 주문 없이 돌린 기록입니다 (--replay-date). 현재가는 1분봉 종가, 체결가는 그 현재가로 가정했고, summarize.py 집계에서 빠집니다.`;
+
+  const s = derive();
+  const pnl = s.trades.reduce((a, t) => a + (t.pnl_net_krw ?? t.pnl_krw ?? 0), 0);
+  const ticks = s.trades.reduce((a, t) => a + (t.ticks ?? 0), 0);
+  const p = s.position;
+  const cards = [
+    ["상태", s.state + (s.done ? ` (${s.done})` : "")],
+    ["기준 구간 H / L", s.H == null ? "–" : `${fmt(s.H)} / ${fmt(s.L)}`],
+    ["포지션", p ? `<span class="${p.side === "LONG" ? "pos" : "neg"}">${p.side} ${p.qty}</span> @ ${fmt(p.avg_price)}` : "없음"],
+    ["손절 / 익절", p?.stop ? `${fmt(p.stop)} / ${fmt(p.take)}` : "–"],
+    ["진입 횟수", `${s.entries}회`],
+    ["누적 손익", `<span class="${pnl > 0 ? "pos" : pnl < 0 ? "neg" : ""}">${pnl > 0 ? "+" : ""}${fmt(pnl)}원</span> <span class="sub">${ticks > 0 ? "+" : ""}${ticks}틱</span>`],
+    ["리스크 차단 / 오류", `${s.blocks} / <span class="${s.errors ? "neg" : ""}">${s.errors}</span>`],
+    ["마지막 기록", hms(s.last) || "–"],
+  ];
+  $("cards").innerHTML = cards.map(([k, v]) => `<div class="card"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
+
+  drawChart(s);
+  $("trades").innerHTML = s.trades.length === 0 ? `<tr><td class="empty">아직 청산된 거래가 없습니다</td></tr>` :
+    `<tr><th>진입</th><th>방향</th><th>진입가</th><th>청산</th><th>청산가</th><th>사유</th><th>틱</th><th>손익(원)</th><th>슬리피지</th></tr>` +
+    s.trades.map((t) => `<tr><td>${hms(t.entry_ts)}</td><td class="${t.side === "LONG" ? "pos" : "neg"}">${t.side}</td>` +
+      `<td>${fmt(t.entry_price)}</td><td>${hms(t.ts)}</td><td>${fmt(t.exit_price)}</td><td>${t.reason}</td>` +
+      `<td>${t.ticks ?? "–"}</td><td class="${t.pnl_net_krw > 0 ? "pos" : t.pnl_net_krw < 0 ? "neg" : ""}">${fmt(t.pnl_net_krw ?? t.pnl_krw)}</td>` +
+      `<td>${t.slippage_ticks ?? "–"}</td></tr>`).join("");
+
+  renderLog(appended);
+}
+
+// ── 5분봉 차트 (SVG) ──────────────────────────────────
+function drawChart(s) {
+  const svg = $("chart");
+  const W = svg.clientWidth || 800, H = 320, padL = 8, padR = 64, padT = 12, padB = 22;
+  const bars = s.bars;
+  if (bars.length === 0) { svg.innerHTML = `<text x="${W / 2}" y="${H / 2}" text-anchor="middle" fill="var(--muted)">봉 기록이 없습니다</text>`; return; }
+  const ys = bars.flatMap((b) => [b.high, b.low]).concat(s.H ?? [], s.L ?? [], s.marks.map((m) => m.price));
+  let lo = Math.min(...ys), hi = Math.max(...ys);
+  const pad = (hi - lo) * 0.08 || 1; lo -= pad; hi += pad;
+  const step = (W - padL - padR) / bars.length;
+  const x = (i) => padL + step * (i + 0.5);
+  const y = (v) => padT + (hi - v) / (hi - lo) * (H - padT - padB);
+  const out = [];
+  for (let k = 0; k <= 4; k++) {   // 가격 눈금
+    const v = lo + (hi - lo) * k / 4;
+    out.push(`<line x1="${padL}" x2="${W - padR}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/>`,
+             `<text x="${W - padR + 6}" y="${y(v) + 4}" font-size="11" fill="var(--muted)">${fmt(Math.round(v))}</text>`);
+  }
+  bars.forEach((b, i) => {
+    const c = b.close >= b.open ? "var(--up)" : "var(--down)";
+    const bw = Math.max(1, step * 0.6);
+    out.push(`<line x1="${x(i)}" x2="${x(i)}" y1="${y(b.high)}" y2="${y(b.low)}" stroke="${c}"/>`,
+             `<rect x="${x(i) - bw / 2}" y="${y(Math.max(b.open, b.close))}" width="${bw}" height="${Math.max(1, Math.abs(y(b.open) - y(b.close)))}" fill="${c}"><title>${b.start}~${b.end}  O ${fmt(b.open)} H ${fmt(b.high)} L ${fmt(b.low)} C ${fmt(b.close)}</title></rect>`);
+    if (i % Math.ceil(bars.length / 8) === 0) out.push(`<text x="${x(i)}" y="${H - 6}" font-size="11" text-anchor="middle" fill="var(--muted)">${b.start}</text>`);
+  });
+  for (const [v, label] of [[s.H, "H"], [s.L, "L"]]) {
+    if (v == null) continue;
+    out.push(`<line x1="${padL}" x2="${W - padR}" y1="${y(v)}" y2="${y(v)}" stroke="var(--accent)" stroke-dasharray="5 4"/>`,
+             `<text x="${padL + 4}" y="${y(v) - 4}" font-size="11" fill="var(--accent)">${label} ${fmt(v)}</text>`);
+  }
+  // 체결 시각이 들어 있는 봉(시작 ≤ 체결 < 끝)에 표시합니다.
+  for (const m of s.marks) {
+    const t = m.ts.slice(11, 16);
+    let i = bars.findIndex((b) => b.start <= t && t < b.end);
+    if (i < 0) i = bars.length - 1;
+    const up = m.side === "LONG";
+    const cy = y(m.price), cx = x(i), d = up ? 1 : -1;
+    out.push(`<path d="M${cx} ${cy} l-6 ${10 * d} h12 z" fill="${m.role === "ENTRY" ? "var(--warn)" : "var(--accent)"}" stroke="var(--panel)"><title>${m.role === "ENTRY" ? "진입" : "청산"} ${m.side} ${fmt(m.price)} @ ${hms(m.ts)}</title></path>`);
+  }
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.innerHTML = out.join("");
+}
+
+// ── 오른쪽 로그 창 ─────────────────────────────────────
+const CHIP = {
+  RUN_START: "c-run", RUN_END: "c-run", RECOVER: "c-run", DONE: "c-run",
+  BAR: "c-bar",
+  RANGE_SET: "c-sig", BREAKOUT: "c-sig", CONFIRM_OK: "c-sig", CONFIRM_FAIL: "c-sig", EXIT_TRIGGER: "c-sig",
+  ORDER_SUBMIT: "c-ord", ORDER_CANCEL: "c-ord", FILL: "c-ord",
+  ENTRY_OPEN: "c-ok", TRADE_CLOSED: "c-ok",
+  RISK_BLOCK: "c-err", ERROR: "c-err",
+};
+
+function summary(e) {
+  const b = e.bar;
+  switch (e.type) {
+    case "RUN_START": return `environment=${e.environment} · dry_run=${e.dry_run}`;
+    case "RUN_END": return `진입 ${e.entries}회 · 사유 ${e.done_reason ?? "–"}${e.interrupted ? " · 중단됨" : ""}`;
+    case "RECOVER": return `진입 ${e.entries_today}회 · 포지션 ${e.position ? `${e.position.side} ${e.position.qty}` : "없음"} · 미체결 ${e.pending_orders}`;
+    case "BAR": return `${b.start}~${b.end}  O ${fmt(b.open)} H ${fmt(b.high)} L ${fmt(b.low)} C ${fmt(b.close)}  V ${fmt(b.volume)}`;
+    case "RANGE_SET": return `H ${fmt(e.H)} / L ${fmt(e.L)}`;
+    case "BREAKOUT": return `${e.side} 돌파 · ${b.start}봉 종가 ${fmt(b.close)}`;
+    case "CONFIRM_OK": return `${e.side} 재확인 성공 · ${b.start}봉 종가 ${fmt(b.close)}`;
+    case "CONFIRM_FAIL": return `${e.side} 재확인 실패 · ${b.start}봉 종가 ${fmt(b.close)}`;
+    case "ORDER_SUBMIT": return `${e.role} ${e.side} 주문 · ${e.order_no ?? "주문번호 없음"}${e.dry_run ? " (DRY)" : ""}`;
+    case "ORDER_CANCEL": return `주문 취소 · ${e.order_no}`;
+    case "FILL": return `${e.role} ${e.side} 체결 ${fmt(e.price)} × ${e.qty}${e.dry_run ? " (가정)" : ""}`;
+    case "ENTRY_OPEN": return `${e.trade.side} 진입 ${fmt(e.trade.entry_price)} · 손절 ${fmt(e.trade.stop)} / 익절 ${fmt(e.trade.take)}`;
+    case "EXIT_TRIGGER": return `${e.reason} 조건 · 가격 ${fmt(e.trigger_price)}`;
+    case "TRADE_CLOSED": return `${e.side} ${e.reason} · ${fmt(e.entry_price)} → ${fmt(e.exit_price)} · ${e.ticks}틱 · ${fmt(e.pnl_net_krw)}원`;
+    case "RISK_BLOCK": return `${e.side} 진입 차단 · ${e.check ?? ""} ${e.value ?? ""} (한도 ${e.limit ?? "–"})`;
+    case "ERROR": return `${e.api ?? ""} ${e.code ?? ""} · ${e.message ?? ""}`;
+    case "DONE": return `당일 종료 · ${e.reason}`;
+    default: return "";
+  }
+}
+
+const opened = new Set();
+function renderLog(appended) {
+  const log = $("log");
+  const q = $("q").value.trim().toLowerCase();
+  const hideBar = $("hideBar").checked;
+  const atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 30;
+  const rows = [];
+  events.forEach((e, i) => {
+    if (hideBar && e.type === "BAR") return;
+    const text = summary(e);
+    if (q && !(`${e.type} ${text}`).toLowerCase().includes(q)) return;
+    rows.push(`<div class="row" data-i="${i}"><span class="t">${hms(e.ts)}</span><span class="chip ${CHIP[e.type] || "c-bar"}">${e.type}</span>${esc(text)}` +
+      (opened.has(i) ? `<pre>${esc(JSON.stringify(e, null, 2))}</pre>` : "") + `</div>`);
+  });
+  log.innerHTML = rows.join("") || `<div class="empty">표시할 로그가 없습니다</div>`;
+  if ($("follow").checked && (appended || atBottom)) log.scrollTop = log.scrollHeight;
+  $("logfoot").textContent = `${rows.length} / ${events.length}줄 표시 · 줄을 누르면 원문이 펼쳐집니다`;
+}
+
+$("log").addEventListener("click", (ev) => {
+  const row = ev.target.closest(".row");
+  if (!row || ev.target.closest("pre")) return;
+  const i = Number(row.dataset.i);
+  opened.has(i) ? opened.delete(i) : opened.add(i);
+  const keep = $("log").scrollTop;
+  renderLog(false);
+  $("log").scrollTop = keep;
+});
+$("q").addEventListener("input", () => renderLog(false));
+$("hideBar").addEventListener("change", () => renderLog(false));
+$("tabs").addEventListener("click", (ev) => {
+  const m = ev.target.dataset?.mode;
+  if (!m) return;
+  mode = m;
+  try { localStorage.setItem("mode", m); } catch {}
+  poll();
+});
+$("file").addEventListener("change", (ev) => {
+  current = ev.target.value; events = []; meta = null; opened.clear();
+  poll();
+});
+window.addEventListener("resize", () => drawChart(derive()));
+
+poll();
+setInterval(poll, POLL_MS);
+</script>
+</body>
+</html>
