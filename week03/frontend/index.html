@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MKU A/B 대시보드</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --panel: #ffffff; --line: #e3e6eb; --text: #1b1f24; --muted: #6b7280;
+    --up: #d63b3b; --down: #2463d1; --accent: #0f766e;
+    --live: #c2410c; --live-bg: #fff1e8; --rep: #4338ca; --rep-bg: #eef0ff;
+    --warn: #b45309; --err: #b91c1c; --ok: #15803d;
+    --a: #2563eb; --b: #c2410c; --fast: #0f766e; --slow: #a16207;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115; --panel: #171a21; --line: #2a2f3a; --text: #e6e8ec; --muted: #8b93a3;
+      --up: #f26b6b; --down: #5b8def; --accent: #2dd4bf;
+      --live: #fb923c; --live-bg: #2a1a10; --rep: #a5b4fc; --rep-bg: #1c1f3a;
+      --warn: #fbbf24; --err: #f87171; --ok: #4ade80;
+      --a: #60a5fa; --b: #fb923c; --fast: #2dd4bf; --slow: #facc15;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--bg); color: var(--text); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Segoe UI", sans-serif; }
+
+  .app { display: grid; grid-template-rows: auto 1fr; height: 100vh; }
+  header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 16px; margin: 0 8px 0 0; }
+  .tabs { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .tabs button { border: 0; background: transparent; color: var(--muted); padding: 6px 12px; font: inherit; cursor: pointer; }
+  .tabs button.on { background: var(--text); color: var(--panel); }
+  .tabs button:disabled { opacity: .4; cursor: default; }
+  select { font: inherit; padding: 5px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--text); }
+  .spacer { flex: 1; }
+  .badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-weight: 600; font-size: 13px; }
+  .badge.live { color: var(--live); background: var(--live-bg); border: 1px solid var(--live); }
+  .badge.replay { color: var(--rep); background: var(--rep-bg); border: 1px solid var(--rep); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; display: inline-block; }
+  .dot.pulse { animation: pulse 1.2s infinite; }
+  @keyframes pulse { 50% { opacity: .25; } }
+  .sub { color: var(--muted); font-size: 12px; font-weight: 400; }
+
+  main { overflow: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; min-height: 0; }
+  .split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  .col { display: flex; flex-direction: column; gap: 12px; min-width: 0; padding-top: 10px; border-top: 4px solid var(--c); }
+  .col.A { --c: var(--a); } .col.B { --c: var(--b); }
+  .colhead { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .colhead b { font-size: 16px; color: var(--c); }
+  .banner { padding: 10px 14px; border-radius: 8px; font-size: 13px; }
+  .banner.live { background: var(--live-bg); color: var(--live); border-left: 4px solid var(--live); }
+  .banner.replay { background: var(--rep-bg); color: var(--rep); border-left: 4px solid var(--rep); }
+
+  .cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .card .k { color: var(--muted); font-size: 12px; }
+  .card .v { font-size: 18px; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+  .panel h2 { font-size: 13px; margin: 0 0 8px; color: var(--muted); font-weight: 600; display: flex; gap: 8px; align-items: center; }
+  svg.chart { width: 100%; height: 280px; display: block; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .legend i { display: inline-block; width: 14px; height: 3px; vertical-align: middle; margin-right: 4px; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; }
+  .scroll { overflow-x: auto; }
+  .pos { color: var(--up); } .neg { color: var(--down); } .err { color: var(--err); }
+  .va { color: var(--a); font-weight: 600; } .vb { color: var(--b); font-weight: 600; }
+  .empty { color: var(--muted); text-align: center; padding: 18px; }
+
+  .quote { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px; align-items: center; }
+  .quote .px { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .quote .meta { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  #spark { width: 100%; height: 56px; display: block; }
+  .st-ok { color: var(--ok); } .st-wait { color: var(--warn); } .st-bad { color: var(--err); } .st-off { color: var(--muted); }
+
+  .logp { padding: 0; display: flex; flex-direction: column; height: 420px; }
+  .logbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  .logbar h2 { margin: 0; font-size: 14px; }
+  .logbar input[type=search] { flex: 1; min-width: 120px; font: inherit; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+  .logbar label { font-size: 12px; color: var(--muted); display: inline-flex; gap: 4px; align-items: center; }
+  .log { flex: 1; overflow: auto; font-family: var(--mono); font-size: 12px; }
+  .row { padding: 5px 12px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .row:hover { background: var(--bg); }
+  .row .t { color: var(--muted); margin-right: 6px; }
+  .chip { display: inline-block; min-width: 92px; padding: 0 6px; border-radius: 4px; font-weight: 600; margin-right: 6px; text-align: center; }
+  .row pre { margin: 6px 0 2px; white-space: pre-wrap; word-break: break-all; color: var(--muted); }
+  .c-run { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+  .c-bar { color: var(--muted); border: 1px solid var(--line); }
+  .c-sig { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+  .c-ord { background: color-mix(in srgb, var(--rep) 18%, transparent); color: var(--rep); }
+  .c-ok { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
+  .c-err { background: color-mix(in srgb, var(--err) 20%, transparent); color: var(--err); }
+  .logfoot { padding: 6px 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+  [data-tip] { cursor: help; }
+  .tipmark { display: inline-block; width: 14px; height: 14px; line-height: 14px; border-radius: 50%; text-align: center;
+             font-size: 10px; font-weight: 700; background: var(--line); color: var(--muted); margin-left: 3px; }
+  #tip { position: fixed; z-index: 10; max-width: 340px; padding: 8px 10px; border-radius: 8px; font-size: 12px; line-height: 1.5;
+         background: var(--text); color: var(--panel); white-space: pre-line; pointer-events: none; display: none;
+         box-shadow: 0 4px 14px rgba(0, 0, 0, .25); }
+
+  @media (max-width: 1100px) {
+    .app { height: auto; }
+    .split { grid-template-columns: 1fr; }
+    .quote { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 560px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>MKU EMA 교차 · A/B 비교</h1>
+    <div class="tabs" id="tabs">
+      <button data-mode="live">실시간 모의</button>
+      <button data-mode="dry-run">DRY_RUN</button>
+      <button data-mode="replay">리플레이</button>
+    </div>
+    <select id="file" aria-label="날짜"></select>
+    <span class="spacer"></span>
+    <span id="badge"></span>
+    <span class="sub" id="updated"></span>
+  </header>
+
+  <main>
+    <div class="panel">
+      <h2>실시간 시세 · FA <span id="wsState" class="sub"></span></h2>
+      <div class="quote">
+        <div>
+          <div class="px" id="qPrice">–</div>
+          <div class="meta" id="qMeta">연결 중…</div>
+        </div>
+        <svg id="spark" aria-label="최근 체결가"></svg>
+      </div>
+    </div>
+    <div id="banner" class="banner"></div>
+    <div class="split" id="split"></div>
+  </main>
+</div>
+<div id="tip"></div>
+
+<script>
+const POLL_MS = 2000;
+const MODES = ["live", "dry-run", "replay"];
+const $ = (id) => document.getElementById(id);
+const px = (n) => n == null ? "–" : Number(n).toFixed(4);
+const hms = (ts) => (ts || "").slice(11, 19);
+const hm = (ts) => (ts || "").slice(11, 16);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const usd = (v) => v == null ? "–" : `<span class="${v > 0 ? "pos" : v < 0 ? "neg" : ""}">${v > 0 ? "+" : ""}${Number(v).toFixed(2)}</span>`;
+const side = (s) => s === "LONG" ? "매수" : s === "SHORT" ? "매도" : (s ?? "–");
+
+let mode = null;
+try { mode = localStorage.getItem("mode"); } catch {}
+const qm = new URLSearchParams(location.search).get("mode");   // ?mode=live 로 바로 열 수 있습니다
+if (MODES.includes(qm)) mode = qm;
+if (!MODES.includes(mode)) mode = null;
+let days = [], day = null, data = null, polling = false;
+const VS = ["A", "B"];
+const VNAME = { A: "A 기본형", B: "B 개선형 · ATR 필터" };
+
+// ── 날짜 목록 ─────────────────────────────────────────
+async function loadDays() {
+  days = await (await fetch("/api/days")).json();
+  const has = new Set(days.map((d) => d.mode));
+  if (!mode) mode = MODES.find((m) => has.has(m)) || "live";   // 처음 열 때만 기록 있는 쪽으로. 누른 탭은 그대로 둡니다
+  document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("on", b.dataset.mode === mode));
+  const shown = days.filter((d) => d.mode === mode);
+  if (!shown.some((d) => d.day === day)) { day = shown[0]?.day || null; data = null; }
+  $("file").innerHTML = shown.map((d) =>
+    `<option value="${d.day}">${d.day.slice(0, 4)}-${d.day.slice(4, 6)}-${d.day.slice(6)} · ${d.A ? "A" : ""}${d.B ? "B" : ""}</option>`
+  ).join("") || `<option value="">기록 없음</option>`;
+  $("file").value = day || "";
+}
+
+async function poll() {
+  if (polling) return;
+  polling = true;
+  try {
+    await loadDays();
+    if (!day) { data = null; render({}); return; }
+    const want = `${mode}/${day}`;
+    const res = await fetch(`/api/compare?mode=${mode}&day=${day}`);
+    if (!res.ok || want !== `${mode}/${day}`) return;
+    const prev = data ? { A: data.A.logs.length, B: data.B.logs.length } : { A: 0, B: 0 };
+    data = await res.json();
+    $("updated").textContent = `갱신 ${new Date().toLocaleTimeString("ko-KR", { hour12: false })}`;
+    render({ A: data.A.logs.length > prev.A, B: data.B.logs.length > prev.B });
+  } catch (e) {
+    $("updated").textContent = "서버 연결 끊김";
+  } finally {
+    polling = false;
+  }
+}
+
+// ── 기록 → 화면 ───────────────────────────────────────
+const MODE_TEXT = { live: "실시간 모의 · 실주문(A)", "dry-run": "실시간 · DRY_RUN", replay: "리플레이 (과거 데이터)" };
+const BANNER = {
+  live: "A 는 모의계좌로 실제 주문을 내고, B 는 A 의 기록으로 ATR 필터만 다르게 다시 계산합니다(주문 없음).",
+  "dry-run": "실시간 시세로 돌지만 주문은 보내지 않은 기록입니다 (--dry-run). 체결가는 그 순간 현재가로 가정했습니다.",
+  replay: "지난 하루의 실제 분봉으로 주문 없이 돌린 기록입니다 (--replay-date). 현재가는 1분봉 종가, 체결가는 그 현재가로 가정했습니다.",
+};
+const VARIANT_NOTE = {
+  A: "EMA 교차마다 진입 · 모의계좌 주문",
+  B: "ATR 비율 0.80~1.50 일 때만 진입 · 주문 없이 A 기록으로 재계산",
+};
+const EMPTY = {
+  live: "실시간 기록이 없습니다. 장중에 uv run python -m trader.main --strategy A (와 B) 를 돌리면 여기에 나옵니다.",
+  "dry-run": "DRY_RUN 기록이 없습니다. uv run python -m trader.main --strategy A --dry-run 으로 돌리면 여기에 나옵니다.",
+  replay: "리플레이 기록이 없습니다. uv run python -m trader.main --strategy AB --replay-date YYYYMMDD --session 08:25-20:35",
+};
+
+const STOP_TEXT = { DEADLINE: "장 마감 정상 종료", CTRL_C: "Ctrl+C 로 중단", SIGTERM: "종료 신호로 중단", SIGHUP: "터미널이 닫혀 중단", CRASH: "오류로 중단", NOT_TODAY: "오늘은 장 없음" };
+const stopText = (r) => STOP_TEXT[r] || r || "종료";
+
+function openPosition(logs) {
+  let p = null;
+  for (const e of logs) {
+    if (e.type === "ENTRY_OPEN") p = e.trade;
+    else if (e.type === "TRADE_CLOSED") p = null;
+    else if (e.type === "RECOVER") p = e.trade || null;
+  }
+  return p;
+}
+
+const FILL_TIP = {
+  head: "체결가를 어디서 가져왔는지\n\nactual · 모의계좌에 실제 주문을 내고 주문내역에서 확인한 체결가\nA · B 가 A 와 같은 신호·같은 방향으로 진입 → A 의 체결가를 그대로 씀\nassumed · 실제 체결이 없어 계산한 가정 체결가 (줄에 마우스를 올리면 규칙)",
+  actual: "actual · 모의계좌 실제 체결\n주문을 내고 주문내역에서 확인한 체결가입니다.",
+  A: "A · A 실제 체결 공유\nA 도 같은 신호 봉·같은 방향으로 진입한 거래라 A 의 진입·청산 체결가를 그대로 씁니다. 진입 뒤 규칙이 같아 청산도 같습니다.",
+  assumedA: "assumed · 가정 체결 (주문 없음)\n리플레이·DRY_RUN 이라 주문을 내지 않았습니다. 그 순간의 현재가(리플레이는 1분봉 종가)에 체결됐다고 봅니다.",
+  assumedB: "assumed · 가정 체결 (B 에만 있는 거래)\nA 는 이 신호로 진입하지 않아 빌려 올 체결가가 없습니다.\n· 진입: 신호 봉 종가\n· 손절·익절: 다음 5분봉부터 고가·저가로 판정, 같은 봉에서 둘 다 닿으면 손절, 갭이면 시가\n· 반대 교차·강제 청산: 그 봉 종가\n· 슬리피지 0",
+};
+const fillTip = (v, src) => src === "assumed" ? FILL_TIP[v === "B" ? "assumedB" : "assumedA"] : FILL_TIP[src] || "";
+
+// 두 칸의 틀을 한 번만 만들고, 값은 render 가 채웁니다.
+function buildColumns() {
+  $("split").innerHTML = VS.map((v) => `
+    <section class="col ${v}">
+      <div class="colhead"><b>${VNAME[v]}</b><span class="sub">${VARIANT_NOTE[v]}</span><span class="spacer"></span><span class="sub" id="state-${v}"></span></div>
+      <div class="cards" id="cards-${v}"></div>
+      <div class="panel"><h2>5분봉 · EMA 9/21 · 진입·청산</h2><svg class="chart" id="chart-${v}"></svg>
+        <div class="legend"><span><i style="background:var(--fast)"></i>EMA 9</span><span><i style="background:var(--slow)"></i>EMA 21</span>
+          <span style="color:var(--c);font-weight:600">▲▼ 진입 ○ 청산${v === "B" ? " ✕ ATR 필터 차단" : ""}</span></div></div>
+      <div class="panel"><h2>거래 내역</h2><div class="scroll"><table id="trades-${v}"></table></div></div>
+      <div class="panel logp">
+        <div class="logbar"><h2>로그</h2>
+          <input type="search" id="q-${v}" placeholder="type·내용 검색">
+          <label><input type="checkbox" id="hideBar-${v}" checked>봉 숨기기</label>
+          <label><input type="checkbox" id="follow-${v}" checked>자동 스크롤</label></div>
+        <div class="log" id="log-${v}"></div>
+        <div class="logfoot" id="logfoot-${v}"></div>
+      </div>
+    </section>`).join("");
+  for (const v of VS) {
+    $(`log-${v}`).addEventListener("click", (ev) => {
+      const row = ev.target.closest(".row");
+      if (!row || ev.target.closest("pre")) return;
+      const k = row.dataset.k;
+      opened.has(k) ? opened.delete(k) : opened.add(k);
+      const keep = $(`log-${v}`).scrollTop;
+      renderLog(v, false);
+      $(`log-${v}`).scrollTop = keep;
+    });
+    $(`q-${v}`).addEventListener("input", () => renderLog(v, false));
+    $(`hideBar-${v}`).addEventListener("change", () => renderLog(v, false));
+  }
+}
+
+function render(appended = {}) {
+  const live = mode !== "replay";
+  const running = !!(data?.A.summary.running || data?.B.summary.running);
+  $("badge").innerHTML = `<span class="badge ${live ? "live" : "replay"}"><span class="dot ${running ? "pulse" : ""}"></span>` +
+    `${MODE_TEXT[mode]}${!data ? " · 기록 없음" : running ? " · 진행 중" : ` · ${esc(stopText(data.A.summary.stop_reason || data.B.summary.stop_reason))}`}</span>`;
+  const banner = $("banner");
+  banner.className = `banner ${live ? "live" : "replay"}`;
+  banner.textContent = data ? BANNER[mode] : EMPTY[mode];
+  const range = chartRange();
+  for (const v of VS) {
+    renderCards(v);
+    drawChart(v, range);
+    renderTrades(v);
+    renderLog(v, !!appended[v]);
+  }
+}
+
+function renderCards(v) {
+  const s = data?.[v].summary, has = !!s?.exists, D = "–";
+  const p = has ? openPosition(data[v].logs) : null;
+  $(`state-${v}`).textContent = !data ? "" : !has ? (v === "B" ? "기록 없음 · --strategy B 로 다시 계산" : "기록 없음") : s.running ? "진행 중" : stopText(s.stop_reason);
+  const cards = [
+    ["상태", has ? esc(s.state || D) : D],
+    ["포지션", !has ? D : p ? `<span class="${p.side === "LONG" ? "pos" : "neg"}">${side(p.side)} ${p.qty}</span> @ ${px(p.entry_price)}` : "없음"],
+    ["손절 / 익절", p ? `${px(p.stop)} / ${px(p.take)}` : D],
+    ["거래", has ? `${s.trades}건 <span class="sub">승 ${s.wins} / 패 ${s.losses}</span>` : D],
+    ["누적 손익 (USD)", has ? `${usd(s.pnl_usd)} <span class="sub">${s.ticks > 0 ? "+" : ""}${s.ticks}틱</span>` : D],
+    v === "A"
+      ? ["평균 청산 슬리피지", has && s.avg_slippage_ticks != null ? `${s.avg_slippage_ticks}틱` : D]
+      : [`체결 출처<span class="tipmark" data-tip="${esc(FILL_TIP.head)}">?</span>`, has ? `A ${s.shared} / 가정 ${s.assumed}` : D],
+    v === "A"
+      ? ["건너뜀", has ? `${s.skips}건` : D]
+      : ["건너뜀 / 필터 차단", has ? `${s.skips} / ${s.filter_blocks}건` : D],
+    ["오류", has ? `<span class="${s.errors ? "err" : ""}">${s.errors}</span>` : D],
+    ["마지막 기록", has ? hms(s.last_ts) || D : D],
+  ];
+  $(`cards-${v}`).innerHTML = cards.map(([k, val]) => `<div class="card"><div class="k">${k}</div><div class="v">${val}</div></div>`).join("");
+}
+
+function renderTrades(v) {
+  const has = !!data?.[v].summary.exists;
+  const rows = has ? data[v].trades : [];
+  const head = `<tr><th>신호 봉</th><th>방향</th><th>진입</th><th>손절 / 익절</th><th>청산</th><th>사유</th><th>틱</th><th>USD</th>` +
+    `<th>체결<span class="tipmark" data-tip="${esc(FILL_TIP.head)}">?</span></th></tr>`;
+  $(`trades-${v}`).innerHTML = head + (rows.length === 0
+    ? `<tr><td class="empty" colspan="9" style="text-align:center">${has ? "아직 청산된 거래가 없습니다" : "–"}</td></tr>`
+    : rows.map((t) => `<tr><td>${hm(t.signal_bar)}</td><td class="${t.side === "LONG" ? "pos" : "neg"}">${side(t.side)}</td>` +
+      `<td>${px(t.entry_price)} <span class="sub">${hm(t.entry_ts)}</span></td><td>${px(t.stop)} / ${px(t.take)}</td>` +
+      `<td>${px(t.exit_price)} <span class="sub">${hm(t.exit_ts || t.ts)}</span></td><td>${esc(t.reason)}</td><td>${t.ticks ?? "–"}</td>` +
+      `<td>${usd(t.pnl_usd)}</td><td class="sub" data-tip="${esc(fillTip(v, t.fill_source))}">${esc(t.fill_source || "")}</td></tr>`).join(""));
+}
+
+// ── 5분봉 차트 (SVG) — 두 칸이 같은 가격 범위를 씁니다 ──────
+function marksOf(v) {
+  const out = [];
+  for (const o of data[v].opens) if (o.entry_ts && o.entry_price != null) out.push({ kind: "in", ts: o.entry_ts, price: o.entry_price, side: o.side });
+  for (const t of data[v].trades) if (t.exit_price != null) out.push({ kind: "out", ts: t.exit_ts || t.ts, price: t.exit_price, side: t.side, reason: t.reason, pnl: t.pnl_usd });
+  return out;
+}
+
+function chartRange() {
+  if (!data || !data.bars.length) return null;
+  const ys = data.bars.flatMap((r) => [r.bar.high, r.bar.low, r.ema_fast, r.ema_slow]).filter((x) => x != null)
+    .concat(VS.flatMap((v) => marksOf(v).map((m) => m.price)));
+  let lo = Math.min(...ys), hi = Math.max(...ys);
+  const pad = (hi - lo) * 0.08 || 0.0005;
+  return [lo - pad, hi + pad];
+}
+
+function drawChart(v, range) {
+  const svg = $(`chart-${v}`);
+  const W = svg.clientWidth || 600, H = 280, padL = 8, padR = 60, padT = 16, padB = 22;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  const rows = data ? data.bars : [];
+  if (!range || rows.length === 0) {
+    const grid = [0, 1, 2, 3, 4].map((k) => { const yy = padT + (H - padT - padB) * k / 4; return `<line x1="${padL}" x2="${W - padR}" y1="${yy}" y2="${yy}" stroke="var(--line)"/>`; }).join("");
+    svg.innerHTML = `${grid}<text x="${(W - padR) / 2}" y="${H / 2}" text-anchor="middle" fill="var(--muted)">${data ? "장중 봉이 아직 없습니다" : "–"}</text>`;
+    return;
+  }
+  const [lo, hi] = range;
+  const bars = rows.map((r) => r.bar);
+  const step = (W - padL - padR) / bars.length;
+  const x = (i) => padL + step * (i + 0.5);
+  const y = (val) => padT + (hi - val) / (hi - lo) * (H - padT - padB);
+  const at = (ts) => { const i = bars.findIndex((b) => b.start <= ts && ts < b.end); return i < 0 ? bars.length - 1 : i; };
+  const out = [];
+  for (let k = 0; k <= 4; k++) {
+    const val = lo + (hi - lo) * k / 4;
+    out.push(`<line x1="${padL}" x2="${W - padR}" y1="${y(val)}" y2="${y(val)}" stroke="var(--line)"/>`,
+             `<text x="${W - padR + 6}" y="${y(val) + 4}" font-size="11" fill="var(--muted)">${px(val)}</text>`);
+  }
+  const s = data.A.summary.session || data.B.summary.session || {};
+  for (const [n, [iso, label]] of [[s.entry_cutoff, "진입 마감"], [s.force_close, "강제 청산"]].entries()) {
+    if (!iso) continue;
+    const i = bars.findIndex((b) => b.start >= iso);
+    if (i <= 0) continue;
+    out.push(`<line x1="${x(i) - step / 2}" x2="${x(i) - step / 2}" y1="${padT}" y2="${H - padB}" stroke="var(--muted)" stroke-dasharray="4 4"/>`,
+             `<text x="${x(i) - step / 2 - 4}" y="${H - padB - 8 - n * 14}" font-size="11" text-anchor="end" fill="var(--muted)">${label}</text>`);
+  }
+  bars.forEach((b, i) => {
+    const c = b.close >= b.open ? "var(--up)" : "var(--down)";
+    const bw = Math.max(1, step * 0.6);
+    out.push(`<line x1="${x(i)}" x2="${x(i)}" y1="${y(b.high)}" y2="${y(b.low)}" stroke="${c}"/>`,
+             `<rect x="${x(i) - bw / 2}" y="${y(Math.max(b.open, b.close))}" width="${bw}" height="${Math.max(1, Math.abs(y(b.open) - y(b.close)))}" fill="${c}"><title>${hm(b.start)}~${hm(b.end)}  O ${px(b.open)} H ${px(b.high)} L ${px(b.low)} C ${px(b.close)}</title></rect>`);
+    if (i % Math.ceil(bars.length / 6) === 0) out.push(`<text x="${x(i)}" y="${H - 6}" font-size="11" text-anchor="${i === 0 ? "start" : "middle"}" fill="var(--muted)">${hm(b.start)}</text>`);
+  });
+  for (const [key, color] of [["ema_fast", "var(--fast)"], ["ema_slow", "var(--slow)"]]) {
+    const d = rows.map((r, i) => r[key] == null ? null : `${x(i).toFixed(1)},${y(r[key]).toFixed(1)}`).filter(Boolean);
+    if (d.length > 1) out.push(`<path d="M${d.join("L")}" fill="none" stroke="${color}" stroke-width="1.5"/>`);
+  }
+  for (const k of v === "B" ? data.B.blocks || [] : []) {
+    const i = bars.findIndex((b) => b.start === k.bar_start);
+    if (i >= 0) out.push(`<text x="${x(i)}" y="${padT}" text-anchor="middle" font-size="12" fill="var(--b)">✕<title>ATR 필터 차단 · 비율 ${k.atr_ratio}</title></text>`);
+  }
+  if (data[v].summary.exists) for (const m of marksOf(v)) {
+    const cx = x(at(m.ts)), cy = y(m.price);
+    if (m.kind === "in") {
+      const d = m.side === "LONG" ? 1 : -1;
+      out.push(`<path d="M${cx} ${cy} l-6 ${10 * d} h12 z" fill="var(--c)" stroke="var(--panel)"><title>${side(m.side)} 진입 ${px(m.price)} @ ${hms(m.ts)}</title></path>`);
+    } else {
+      out.push(`<circle cx="${cx}" cy="${cy}" r="4.5" fill="var(--panel)" stroke="var(--c)" stroke-width="2"><title>청산 ${m.reason} ${px(m.price)} (${m.pnl} USD) @ ${hms(m.ts)}</title></circle>`);
+    }
+  }
+  svg.innerHTML = out.join("");
+}
+
+// ── 로그 ───────────────────────────────────────────────
+const CHIP = {
+  RUN_START: "c-run", RUN_END: "c-run", RECOVER: "c-run", WAIT_OPEN: "c-run", SOURCE_RESTART: "c-run", WS_STATUS: "c-run",
+  BAR: "c-bar",
+  CROSS: "c-sig", ENTRY_SIGNAL: "c-sig", EXIT_SIGNAL: "c-sig", EXIT_TRIGGER: "c-sig", SKIP: "c-sig", ATR_FILTER_BLOCK: "c-sig",
+  ORDER_SUBMIT: "c-ord", ORDER_CANCEL: "c-ord", FILL: "c-ord",
+  ENTRY_OPEN: "c-ok", TRADE_CLOSED: "c-ok",
+  RISK_BLOCK: "c-err", ERROR: "c-err",
+};
+const SKIP_TEXT = {
+  MAX_ENTRIES: "하루 진입 3회를 다 씀", OUTSIDE_ENTRY_WINDOW: "진입 시간 밖", stop_below_1tick: "손절 거리 1틱 미만",
+  ATR_WARMUP: "ATR 기준값 준비 중",
+};
+const ratio = (v) => v == null ? "–" : Number(v).toFixed(2);
+
+function summary(e) {
+  const b = e.bar, t = e.trade, lv = e.levels_at_signal;
+  switch (e.type) {
+    case "RUN_START": return e.strategy === "B"
+      ? `B 재계산 시작 · A 기록 따라 읽기${e.source_dry_run ? " (A 주문 없음)" : ""}`
+      : `${e.strategy} 시작 · ${e.environment}${e.dry_run ? " · 주문 없음" : " · 실주문"} · 장 ${hm(e.session?.open)}~${hm(e.session?.close)}`;
+    case "RUN_END": return e.strategy === "B"
+      ? `B 종료 · 거래 ${e.trades}건 (공유 ${e.shared} / 가정 ${e.assumed}) · ${e.pnl_usd} USD`
+      : `${e.stop_reason_text || e.stop_reason || "종료"}${e.stop_detail ? ` (${e.stop_detail})` : ""} · 진입 ${e.entries}회`;
+    case "RECOVER": return `진입 ${e.entries_today}회 · 포지션 ${e.position ? `${side(e.position.side)} ${e.position.qty}` : "없음"} · 미체결 ${e.pending_orders}`;
+    case "WAIT_OPEN": return `장 시작 ${hm(e.open)} 까지 ${e.wait_min}분 대기`;
+    case "SOURCE_RESTART": return e.note || "A 재시작";
+    case "WS_STATUS": return `웹소켓 ${e.kind}${e.detail?.error ? ` · ${e.detail.error}` : ""}`;
+    case "BAR": return `${hm(b.start)}  O ${px(b.open)} H ${px(b.high)} L ${px(b.low)} C ${px(b.close)} · EMA ${px(e.ema_fast)}/${px(e.ema_slow)} · ATR비 ${ratio(e.atr_ratio)}${e.cross ? ` · 교차 ${side(e.cross)}` : ""}`;
+    case "CROSS": return `${side(e.side)} 교차 · ${hm(e.bar_start)}봉 · ATR비 ${ratio(e.atr_ratio)}`;
+    case "ENTRY_SIGNAL": return `${side(e.side)} 진입 신호 · ${px(lv?.entry)} · 손절 ${px(lv?.stop)} (${lv?.stop_ticks}틱) / 익절 ${px(lv?.take)} (${lv?.take_ticks}틱)`;
+    case "ATR_FILTER_BLOCK": return `${side(e.side)} 신호 차단 · ATR비 ${ratio(e.atr_ratio)} (허용 ${e.band?.[0]}~${e.band?.[1]})`;
+    case "SKIP": return `${side(e.side)} 건너뜀 · ${SKIP_TEXT[e.reason] || e.reason}`;
+    case "EXIT_SIGNAL": return `반대 교차 → 청산 (${side(e.position)} 보유)`;
+    case "EXIT_TRIGGER": return `${e.reason} 조건 · 가격 ${px(e.trigger_price)}${e.attempt > 1 ? ` · ${e.attempt}번째` : ""}`;
+    case "ORDER_SUBMIT": return `${e.role} ${side(e.side)} 주문 · ${e.order_no ?? "주문번호 없음"}${e.dry_run ? " (DRY)" : ""}`;
+    case "ORDER_CANCEL": return `주문 취소 · ${e.order_no}`;
+    case "FILL": return `${e.role} ${side(e.side)} 체결 ${px(e.price)} × ${e.qty}${e.fill_source === "actual" ? "" : " (가정)"}`;
+    case "ENTRY_OPEN": return `${side(t.side)} 진입 ${px(t.entry_price)} · 손절 ${px(t.stop)} / 익절 ${px(t.take)}${e.fill_source ? ` · ${e.fill_source === "A" ? "A 체결 공유" : "가정 체결"}` : ""}`;
+    case "TRADE_CLOSED": return `${side(e.side)} ${e.reason} · ${px(e.entry_price)} → ${px(e.exit_price)} · ${e.ticks}틱 · ${e.pnl_usd} USD`;
+    case "RISK_BLOCK": return `${side(e.side)} 진입 차단 · ${e.check} ${typeof e.value === "object" ? "" : (e.value ?? "")}${e.limit != null ? ` (한도 ${e.limit})` : ""}`;
+    case "ERROR": return `${e.api ?? ""} ${e.code ?? ""} · ${e.message ?? ""}`;
+    default: return "";
+  }
+}
+
+const opened = new Set();
+function renderLog(v, appended) {
+  const log = $(`log-${v}`);
+  const events = data ? data[v].logs : [];
+  const q = $(`q-${v}`).value.trim().toLowerCase();
+  const hideBar = $(`hideBar-${v}`).checked;
+  const atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 30;
+  const rows = [];
+  events.forEach((e, i) => {
+    if (hideBar && e.type === "BAR") return;
+    const text = summary(e);
+    if (q && !(`${e.type} ${text}`).toLowerCase().includes(q)) return;
+    const key = `${v}:${i}`;
+    rows.push(`<div class="row" data-k="${key}"><span class="t">${hms(e.ts)}</span><span class="chip ${CHIP[e.type] || "c-bar"}">${e.type}</span>${esc(text)}` +
+      (opened.has(key) ? `<pre>${esc(JSON.stringify(e, null, 2))}</pre>` : "") + `</div>`);
+  });
+  log.innerHTML = rows.join("") || `<div class="empty">–</div>`;
+  if ($(`follow-${v}`).checked && (appended || atBottom)) log.scrollTop = log.scrollHeight;
+  $(`logfoot-${v}`).textContent = `${rows.length} / ${events.length}줄 표시 · 줄을 누르면 원문이 펼쳐집니다`;
+}
+
+// ── 툴팁 (표 스크롤에 잘리지 않게 화면 위에 띄웁니다) ──────
+document.addEventListener("mouseover", (ev) => {
+  const el = ev.target.closest?.("[data-tip]");
+  const tip = $("tip");
+  if (!el || !el.dataset.tip) { tip.style.display = "none"; return; }
+  tip.textContent = el.dataset.tip;
+  tip.style.display = "block";
+  const r = el.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
+  tip.style.left = `${Math.max(8, Math.min(r.left, innerWidth - w - 8))}px`;
+  tip.style.top = `${r.bottom + 6 + h > innerHeight ? r.top - h - 6 : r.bottom + 6}px`;
+});
+document.addEventListener("scroll", () => { $("tip").style.display = "none"; }, true);
+
+$("tabs").addEventListener("click", (ev) => {
+  const m = ev.target.dataset?.mode;
+  if (!m) return;
+  mode = m; day = null; data = null; opened.clear();
+  try { localStorage.setItem("mode", m); } catch {}
+  poll();
+});
+$("file").addEventListener("change", (ev) => { day = ev.target.value; data = null; opened.clear(); poll(); });
+window.addEventListener("resize", () => { const r = chartRange(); for (const v of VS) drawChart(v, r); });
+
+// ── 실시간 시세 (웹소켓 /ws/live) ──────────────────────
+const WS_TEXT = {
+  idle: ["대기", "st-off"], starting: ["접속 중", "st-wait"], connected: ["연결됨 · 구독 중", "st-ok"],
+  subscribed: ["연결됨 · 수신 대기", "st-ok"], disconnected: ["끊김 · 다시 접속 중", "st-wait"],
+  reconnect_wait: ["다시 접속 대기", "st-wait"], error: ["오류", "st-bad"], fatal: ["인증 거부", "st-bad"],
+  fail: ["구독 실패", "st-bad"], no_key: ["키 없음", "st-bad"], disabled: ["꺼짐 (DASHBOARD_LIVE=0)", "st-off"],
+  rest_error: ["현재가 조회 실패", "st-wait"], browser_closed: ["대시보드 서버와 끊김 · 다시 접속 중", "st-wait"],
+};
+const live = { status: "idle", detail: "", info: {}, ticks: [] };
+
+function renderLive() {
+  const [label, cls] = WS_TEXT[live.status] || [live.status, "st-wait"];
+  $("wsState").innerHTML = `<span class="${cls}"><span class="dot ${cls === "st-ok" ? "pulse" : ""}"></span> ${esc(label)}</span>` +
+    (live.detail && cls !== "st-ok" && live.status !== "disabled" ? ` · ${esc(live.detail)}` : "");
+  const last = live.ticks[live.ticks.length - 1];
+  const sym = live.info.real_sym || live.info.symbol || "MKUX26";
+  if (last) {
+    const first = live.ticks[0].price, diff = last.price - first;
+    $("qPrice").innerHTML = `${px(last.price)} <span class="sub ${diff > 0 ? "pos" : diff < 0 ? "neg" : ""}">${diff > 0 ? "+" : ""}${(diff / 0.0001).toFixed(0)}틱</span>`;
+    $("qMeta").textContent = `${sym} · 체결 ${last.ko_exec_tm || "–"} · 매수/매도호가 ${px(last.bid)} / ${px(last.ask)} · 수량 ${last.qty ?? "–"} · 받은 체결 ${live.ticks.length}건`;
+  } else if (live.info.rest?.price != null) {
+    const t = live.info.rest.time || "";
+    $("qPrice").textContent = px(live.info.rest.price);
+    $("qMeta").textContent = `${sym} · REST 마지막 체결 ${t.slice(0, 2)}:${t.slice(2, 4)}:${t.slice(4, 6)} · 웹소켓 체결은 아직 없습니다 (장 시간이 아니면 오지 않습니다)`;
+  } else {
+    $("qPrice").textContent = "–";
+    $("qMeta").textContent = `${sym} · 체결 대기`;
+  }
+  drawSpark();
+}
+
+function drawSpark() {
+  const svg = $("spark");
+  const W = svg.clientWidth || 400, H = 56, ps = live.ticks.map((t) => t.price);
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  if (ps.length < 2) { svg.innerHTML = `<text x="${W / 2}" y="${H / 2 + 4}" text-anchor="middle" font-size="12" fill="var(--muted)">체결이 들어오면 여기에 그립니다</text>`; return; }
+  const lo = Math.min(...ps), hi = Math.max(...ps), span = (hi - lo) || 0.0001;
+  const pts = ps.map((p, i) => `${(i / (ps.length - 1) * (W - 4) + 2).toFixed(1)},${(H - 4 - (p - lo) / span * (H - 8)).toFixed(1)}`);
+  svg.innerHTML = `<polyline points="${pts.join(" ")}" fill="none" stroke="var(--accent)" stroke-width="1.5"/>`;
+}
+
+let wsDelay = 1000;
+function connectLive() {
+  const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws/live`);
+  ws.onopen = () => { wsDelay = 1000; };
+  ws.onmessage = (m) => {
+    const e = JSON.parse(m.data);
+    if (e.type === "snapshot") { Object.assign(live, { status: e.status, detail: e.detail, info: e.info || {}, ticks: e.ticks || [] }); }
+    else if (e.type === "status") { live.status = e.status; live.detail = e.detail || ""; }
+    else if (e.type === "info") { live.info = e.info || {}; }
+    else if (e.type === "tick") { live.ticks.push(e); if (live.ticks.length > 300) live.ticks.shift(); }
+    else return;
+    renderLive();
+  };
+  ws.onclose = () => {
+    live.status = "browser_closed"; live.detail = "";
+    renderLive();
+    setTimeout(connectLive, wsDelay);
+    wsDelay = Math.min(wsDelay * 2, 10000);
+  };
+}
+
+buildColumns();
+render({});
+renderLive();
+connectLive();
+poll();
+setInterval(poll, POLL_MS);
+</script>
+</body>
+</html>

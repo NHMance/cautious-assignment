@@ -1,0 +1,21 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+# 인증 정보는 Git 에 넣지 않습니다 (.env 또는 ~/NHFutures/config/config.yaml).
+.env
+.env.*
+!.env.example
+config.yaml
+poc/out/
+# 웹소켓 원문 샘플은 점검용(계좌 칸은 지우지만 올리지 않음)
+results/ws_samples/
+poc/
+
+# API 응답 원문(필드 확인용)·실시간 체결 기록·봇 테스트 기록은 올리지 않습니다
+results/samples/
+results/ticks/
+results/bot-test/
+
+# 지울것
+results/

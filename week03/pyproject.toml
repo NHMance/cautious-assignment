@@ -1,0 +1,24 @@
+[project]
+name = "week03-mku-ema-atr"
+version = "0.1.0"
+description = "3주차 SGX 미니 원달러(MKU) EMA 추세추종 + ATR 검증 (NH선물 해외 모의)"
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.27",
+    "pyyaml>=6.0",
+    "truststore>=0.10.4",
+    "websockets>=13.0",
+]
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
+dashboard = ["fastapi>=0.115", "uvicorn>=0.30"]
+
+[tool.uv]
+package = false
+default-groups = ["dev"]
+
+[tool.pytest.ini_options]
+# week02 의 bot·backend 를 그대로 불러 씁니다(trader/__init__.py 와 같은 경로).
+pythonpath = [".", "../week02"]
+testpaths = ["tests"]
