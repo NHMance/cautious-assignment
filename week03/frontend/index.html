@@ -205,7 +205,7 @@ const BANNER = {
 };
 const VARIANT_NOTE = {
   A: "EMA 교차마다 진입 · 모의계좌 주문",
-  B: "ATR 비율 0.80~1.50 일 때만 진입 · 주문 없이 A 기록으로 재계산",
+  B: (band) => `ATR 비율 ${band ? band.map((x) => Number(x).toFixed(2)).join("~") : "설정 범위"} 일 때만 진입 · 주문 없이 A 기록으로 재계산`,
 };
 const EMPTY = {
   live: "실시간 기록이 없습니다. 장중에 uv run python -m trader.main --strategy A (와 B) 를 돌리면 여기에 나옵니다.",
@@ -235,11 +235,19 @@ const FILL_TIP = {
 };
 const fillTip = (v, src) => src === "assumed" ? FILL_TIP[v === "B" ? "assumedB" : "assumedA"] : FILL_TIP[src] || "";
 
+// B 의 ATR 범위는 화면에 고정하지 않고 B 기록의 RUN_START.settings.ATR_BAND 에서 읽습니다.
+function noteFor(v) {
+  const note = VARIANT_NOTE[v];
+  if (typeof note !== "function") return note;
+  const start = (data?.[v]?.logs || []).find((r) => r.type === "RUN_START");
+  return note(start?.settings?.ATR_BAND);
+}
+
 // 두 칸의 틀을 한 번만 만들고, 값은 render 가 채웁니다.
 function buildColumns() {
   $("split").innerHTML = VS.map((v) => `
     <section class="col ${v}">
-      <div class="colhead"><b>${VNAME[v]}</b><span class="sub">${VARIANT_NOTE[v]}</span><span class="spacer"></span><span class="sub" id="state-${v}"></span></div>
+      <div class="colhead"><b>${VNAME[v]}</b><span class="sub" id="note-${v}">${noteFor(v)}</span><span class="spacer"></span><span class="sub" id="state-${v}"></span></div>
       <div class="cards" id="cards-${v}"></div>
       <div class="panel"><h2>5분봉 · EMA 9/21 · 진입·청산</h2><svg class="chart" id="chart-${v}"></svg>
         <div class="legend"><span><i style="background:var(--fast)"></i>EMA 9</span><span><i style="background:var(--slow)"></i>EMA 21</span>
@@ -279,6 +287,7 @@ function render(appended = {}) {
   banner.textContent = data ? BANNER[mode] : EMPTY[mode];
   const range = chartRange();
   for (const v of VS) {
+    $(`note-${v}`).textContent = noteFor(v);
     renderCards(v);
     drawChart(v, range);
     renderTrades(v);
