@@ -1,0 +1,20 @@
+# Team 05 초기 설계값. A/B/C 비교는 entry_z 만 바꿉니다.
+window = 24
+entry_z = 1.5
+exit_z = 0.25
+stop_z = 2.5
+max_hold_minutes = 60
+max_entries = 3
+trade_loss_krw = 10000
+daily_loss_krw = 30000
+entry_cutoff = "15:00"
+force_close = "15:10"
+deadline = "15:20"
+# 실제 계좌 수수료로 수정하세요. 0 은 비용 미반영이라는 뜻입니다.
+fee_per_leg_side = 0.0
+# 리플레이만: 각 주문을 다음 봉 시가보다 불리하게 1틱 체결한다고 가정합니다.
+slippage_ticks = 1
+# 실시간 진입 필터: 각 레그의 최우선 매수·매도 차이 2틱 이하, 잔량 1 이상.
+max_book_ticks = 2
+max_quote_age_seconds = 10
+max_quote_skew_seconds = 3
