@@ -137,6 +137,8 @@ def run_paper(pair, cfg, root: Path, *, env_file=None):
         end_reason = type(exc).__name__
         uncertain = isinstance(exc, Uncertain)
         journal.write("HALT", error_kind=type(exc).__name__,
+                      api=getattr(exc, "api_id", None),
+                      cause=type(exc.__cause__).__name__ if exc.__cause__ else None,
                       detail=str(exc) if isinstance(exc, (Uncertain, ValueError, RuntimeError)) else "API/시스템 오류: 예외 종류와 원본 API 기록 확인",
                       manual_reconciliation=uncertain)
         # 상태 불명은 반대주문도 보내지 않습니다. 상태가 알려진 보유분만 비상 청산합니다.

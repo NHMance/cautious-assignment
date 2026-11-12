@@ -5,10 +5,16 @@ from datetime import datetime
 from pathlib import Path
 import os
 import json
+import time
+import httpx
+from backend.nh_api.errors import TransportError
 from .strategy import ROOT, KST, Quote, MULTIPLIER, Bar, PairBar, at
 import hashlib
 from .journal import save_json
 from math import isfinite
+
+QUOTE_RETRIES = 3
+QUOTE_RETRY_DELAY = 1.0
 
 
 def create_client(env_file: Path | None = None):
@@ -40,7 +46,22 @@ def create_client(env_file: Path | None = None):
 
 def quote(api, symbol, journal):
     from backend.domestic_futureoption import domestic_futureoption_functions as nh
-    raw = nh.price_bid(symbol, api=api)
+    for attempt in range(1, QUOTE_RETRIES + 2):
+        try:
+            raw = nh.price_bid(symbol, api=api)
+            break
+        except TransportError as exc:
+            # 호가 요청의 시간 초과만 다시 조회합니다. 인증 실패·업무 오류나
+            # 주문 접수 상태 불명에 이 재시도 규칙을 적용하지 않습니다.
+            if exc.api_id != "domestic_price-bid" or not isinstance(exc.__cause__, httpx.TimeoutException):
+                raise
+            fields = dict(api=exc.api_id, symbol=symbol, cause=type(exc.__cause__).__name__,
+                          attempt=attempt, max_retries=QUOTE_RETRIES)
+            if attempt > QUOTE_RETRIES:
+                journal.write("QUOTE_RETRY_EXHAUSTED", **fields)
+                raise
+            journal.write("QUOTE_RETRY", delay_seconds=QUOTE_RETRY_DELAY, **fields)
+            time.sleep(QUOTE_RETRY_DELAY)
     now = datetime.now(KST)
     journal.write("API_RESPONSE", api="domestic_price-bid", symbol=symbol, response=raw)
     if str(raw.get("sym", "")).strip() != symbol:

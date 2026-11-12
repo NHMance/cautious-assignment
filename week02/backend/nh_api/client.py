@@ -24,7 +24,7 @@ from typing import Any
 import httpx
 
 from backend.auth.auth_functions import AuthError
-from backend.nh_api.catalog import COMMON, ApiSpec, http_spec
+from backend.nh_api.catalog import COMMON, ApiSpec, Limit, http_spec
 from backend.nh_api import error_codes
 from backend.nh_api.errors import (
     BusinessError,
@@ -232,11 +232,16 @@ class TradeClient:
                 return self._session.client.get(url, headers=headers)
             return self._session.client.request(spec.method, url, headers=headers, json=payload)
         except httpx.TimeoutException as exc:
+            if spec.limit == Limit.ORDER:
+                guidance = (
+                    "보내지 못한 것인지 처리된 것인지 알 수 없으므로, 다시 보내기 전에 "
+                    "주문내역이나 잔고로 확인해 주세요."
+                )
+            else:
+                guidance = "조회 응답을 받지 못했습니다. 잠시 후 다시 조회해 주세요."
             raise TransportError(
                 spec.api_id,
-                f"{spec.name} 요청이 시간 안에 끝나지 않았습니다. "
-                "보내지 못한 것인지 처리된 것인지 알 수 없으므로, 다시 보내기 전에 "
-                "주문내역이나 잔고로 확인해 주세요.",
+                f"{spec.name} 요청이 시간 안에 끝나지 않았습니다. {guidance}",
             ) from exc
         except httpx.HTTPError as exc:
             raise TransportError(spec.api_id, f"{spec.name} 요청에 실패했습니다: {exc}") from exc

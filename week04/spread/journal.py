@@ -46,7 +46,10 @@ class Journal:
             f.flush()
             os.fsync(f.fileno())
         if self.echo and event in {"RUN_START", "ENTRY_ATTEMPT", "ORDER_INTENT", "ORDER_SUBMIT", "FILL",
-                                   "PAIR_OPEN", "PAIR_CLOSED", "UNWIND", "HALT", "RUN_END", "SKIP"}:
-            brief = {k: record[k] for k in ("role", "reason", "order_no", "net_pnl", "flat") if k in record}
+                                   "PAIR_OPEN", "PAIR_CLOSED", "UNWIND", "HALT", "RUN_END", "SKIP",
+                                   "QUOTE_RETRY", "QUOTE_RETRY_EXHAUSTED"}:
+            brief = {k: record[k] for k in ("role", "reason", "order_no", "net_pnl", "flat",
+                                          "error_kind", "api", "symbol", "cause", "detail", "manual_reconciliation",
+                                          "attempt", "max_retries", "delay_seconds") if k in record}
             print(f"[{record['ts']}] {self.mode} {event} {json.dumps(brief, ensure_ascii=False)}", flush=True)
         return record
