@@ -84,10 +84,14 @@ def run_paper(pair, cfg, root: Path, *, env_file=None):
                         continue
                     sig, reason, stats = strategy.observe(p)
                     journal.write("OBSERVATION", ts=p.ts, reason=reason, **stats)
-                    if sig and (last_done is None or sig.ts > last_done) and 0 <= (now - sig.ts).total_seconds() <= 30:
-                        candidate = sig
-                    elif sig:
-                        journal.write("SKIP", ts=p.ts, reason="OLD_SIGNAL")
+                    if sig:
+                        # Signal.ts는 PairBar.ts에서 받은 봉 마감 시각입니다.
+                        signal_age = (now - sig.ts).total_seconds()
+                        if (last_done is None or sig.ts > last_done) and 0 <= signal_age <= 30:
+                            candidate = sig
+                        else:
+                            journal.write("SKIP", ts=sig.ts, reason="OLD_SIGNAL",
+                                          age_seconds=signal_age)
                 # 다음 5분봉 확정 시각의 5초 뒤에 갱신합니다.
                 next_boundary = ((int(now.timestamp()) // 300) + 1) * 300 + 5
                 next_bars = time.monotonic() + max(1, next_boundary - now.timestamp())
