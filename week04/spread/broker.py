@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from math import isfinite
 import time
-from .strategy import Fill, KST, MULTIPLIER, Position
+from .strategy import Fill, KST, MULTIPLIER, Position, quote_problem, entry_problem
 
 
 class Uncertain(RuntimeError):
@@ -219,10 +219,20 @@ class PairExecutor:
                     out[f.symbol] = f.side
         return out
 
-    def open(self, signal, nq, fq):
+    def open(self, signal, nq, fq, *, refresh_quotes=None):
         if self.halted or self.position:
             raise RuntimeError("진입할 수 없는 상태입니다")
         self.broker.assert_positions({self.near: 0, self.far: 0})
+        if refresh_quotes:
+            latest = refresh_quotes()
+            if latest is None:
+                self.journal.write("SKIP", reason="LIVE_DATA_CHANGED_BEFORE_ENTRY")
+                return False
+            nq, fq = latest
+            problem = quote_problem(nq, fq, datetime.now(KST), self.cfg) or entry_problem(signal, nq, fq, self.cfg)
+            if problem:
+                self.journal.write("SKIP", reason=problem, signal=signal)
+                return False
         self.entries += 1  # 실패한 시도도 일일 최대 3회에 포함합니다.
         self.journal.write("ENTRY_ATTEMPT", ts=nq.ts, signal=signal, entry_number=self.entries)
         # 근월물 체결을 확인한 후 차월물을 보냅니다. 두 주문은 원자적이지 않습니다.

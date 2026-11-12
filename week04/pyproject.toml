@@ -3,7 +3,7 @@ name = "week04-usd-calendar-spread"
 version = "0.1.0"
 description = "Team 05 미국달러선물 11·12월물 스프레드 모의매매와 비교 검증"
 requires-python = ">=3.11"
-dependencies = ["httpx>=0.27", "pyyaml>=6.0", "truststore>=0.10.4"]
+dependencies = ["httpx>=0.27", "pyyaml>=6.0", "truststore>=0.10.4", "websockets>=13.0"]
 
 [dependency-groups]
 dev = ["pytest>=8.0"]

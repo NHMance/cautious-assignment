@@ -89,42 +89,29 @@ def test_quote_recovers_within_three_retries(tmp_path, monkeypatch, failures):
 
 
 @pytest.mark.parametrize("timeout_kind", [httpx.ConnectTimeout, httpx.ReadTimeout])
-def test_paper_halts_after_quote_retries_without_ordering(tmp_path, monkeypatch, timeout_kind):
-    import main
+def test_rest_quote_query_exhausts_retries_without_ordering(tmp_path, monkeypatch, timeout_kind):
     requests, delays = [], []
-
-    class Clock(datetime):
-        @classmethod
-        def now(cls, tz=None):
-            return datetime(2026, 11, 12, 12, tzinfo=KST)
 
     def timeout(request):
         requests.append(request)
         raise timeout_kind("test timeout", request=request)
 
     monkeypatch.setattr(market.time, "sleep", delays.append)
-    monkeypatch.setattr(main, "datetime", Clock)
-    monkeypatch.setattr(main, "ROOT", tmp_path)
-    monkeypatch.setattr(main, "verify_prices", lambda *args: None)
-    monkeypatch.setattr(main, "fetch_bars", lambda *args: [])
-    monkeypatch.setattr(main, "PaperBroker", lambda *args: SimpleNamespace(assert_positions=lambda expected: None))
+    journal = Journal(tmp_path, "check")
     with httpx.Client(transport=httpx.MockTransport(timeout)) as http:
-        monkeypatch.setattr(main, "create_client", lambda env_file: client_for(http))
         with pytest.raises(TransportError) as error:
-            main.run_paper({"near": {"series": "N"}, "far": {"series": "F"}}, Settings(), tmp_path / "log")
+            market.quote(client_for(http), "N", journal)
 
     assert error.value.api_id == "domestic_price-bid"
     assert len(requests) == 4
     assert all(r.url.path == "/trade/v1/domestic/price-bid" for r in requests)
     assert delays == [1.0] * 3
-    rows = [json.loads(s) for s in next((tmp_path / "log").glob("journal_*.jsonl")).read_text().splitlines()]
+    rows = [json.loads(s) for s in journal.path.read_text().splitlines()]
     assert [r["type"] for r in rows] == [
-        "RUN_START", "DATA_ALIGNMENT", "QUOTE_RETRY", "QUOTE_RETRY", "QUOTE_RETRY",
-        "QUOTE_RETRY_EXHAUSTED", "HALT", "RUN_END",
+        "QUOTE_RETRY", "QUOTE_RETRY", "QUOTE_RETRY", "QUOTE_RETRY_EXHAUSTED",
     ]
-    assert rows[-2]["api"] == "domestic_price-bid"
-    assert rows[-2]["cause"] == timeout_kind.__name__
-    assert not (tmp_path / "results/private/paper.lock").exists()
+    assert rows[-1]["api"] == "domestic_price-bid"
+    assert rows[-1]["cause"] == timeout_kind.__name__
 
 
 @pytest.mark.parametrize("error_kind", [ValueError, TransportError])
