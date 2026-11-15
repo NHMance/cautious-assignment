@@ -20,7 +20,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import date, datetime, time, timedelta
 from enum import Enum
 from typing import Any
@@ -47,6 +47,26 @@ class Session:
     open: datetime                       # 봇 운영 시작
     close: datetime                      # 봇 운영 종료(RUN_END)
     trade_end: datetime | None = None    # 실제 거래 마감. 있으면 진입 마감·강제 청산을 여기서 셉니다
+    entry_cutoff_at: datetime | None = None
+    force_close_at: datetime | None = None
+
+    @classmethod
+    def for_duration(cls, start: datetime, minutes: int, *, liquidate_at: time | None = None) -> Session:
+        if minutes <= 0:
+            raise ValueError("운영 시간은 1분 이상이어야 합니다")
+        entry_end = start + timedelta(minutes=minutes)
+        end = datetime.combine(start.date(), liquidate_at, tzinfo=start.tzinfo) if liquidate_at else entry_end
+        if end <= start:
+            raise ValueError("오늘의 강제 청산 시각이 이미 지났습니다. 다음 날로 자동 이월하지 않습니다")
+        return cls(start, end, entry_cutoff_at=min(entry_end, end), force_close_at=end)
+
+    def with_liquidation(self, liquidate_at: time) -> Session:
+        when = datetime.combine(self.open.date(), liquidate_at, tzinfo=self.open.tzinfo)
+        if when < self.open and self.close.date() > self.open.date():
+            when += timedelta(days=1)
+        if not self.open <= when <= self.close:
+            raise ValueError("강제 청산 시각은 지정한 운영 시간 안에 있어야 합니다")
+        return Session(self.open, self.close, self.trade_end, when, when)
 
     @classmethod
     def of(cls, day: date, opened: time, closed: time, trade_end: time | None = None) -> Session:
@@ -67,7 +87,9 @@ class Session:
     def from_dict(cls, d: dict[str, str]) -> Session:
         last = d.get("trade_end")
         return cls(datetime.fromisoformat(d["open"]), datetime.fromisoformat(d["close"]),
-                   datetime.fromisoformat(last) if last else None)
+                   datetime.fromisoformat(last) if last else None,
+                   datetime.fromisoformat(d["entry_cutoff_at"]) if d.get("entry_cutoff_at") else None,
+                   datetime.fromisoformat(d["force_close_at"]) if d.get("force_close_at") else None)
 
     @property
     def last_trade(self) -> datetime:
@@ -75,15 +97,17 @@ class Session:
 
     @property
     def entry_cutoff(self) -> datetime:
-        return self.last_trade - timedelta(minutes=settings.ENTRY_CUTOFF_MIN_BEFORE_CLOSE)
+        return self.entry_cutoff_at or self.last_trade - timedelta(minutes=settings.ENTRY_CUTOFF_MIN_BEFORE_CLOSE)
 
     @property
     def force_close(self) -> datetime:
-        return self.last_trade - timedelta(minutes=settings.FORCE_CLOSE_MIN_BEFORE_CLOSE)
+        return self.force_close_at or self.last_trade - timedelta(minutes=settings.FORCE_CLOSE_MIN_BEFORE_CLOSE)
 
     def to_dict(self) -> dict[str, str | None]:
         return {"open": self.open.isoformat(), "close": self.close.isoformat(),
                 "trade_end": self.trade_end.isoformat() if self.trade_end else None,
+                "entry_cutoff_at": self.entry_cutoff_at.isoformat() if self.entry_cutoff_at else None,
+                "force_close_at": self.force_close_at.isoformat() if self.force_close_at else None,
                 "entry_cutoff": self.entry_cutoff.isoformat(), "force_close": self.force_close.isoformat()}
 
 
@@ -230,7 +254,7 @@ class Strategy:
     """variant "A" 는 기본형, "B" 는 ATR 필터를 더한 개선형."""
 
     def __init__(self, variant: str, session: Session, *, entries_done: int = 0,
-                 realized_pnl: float = 0.0) -> None:
+                 realized_pnl: float = 0.0, trend_entry: bool = False) -> None:
         if variant not in ("A", "B"):
             raise ValueError(f"전략은 A 또는 B 입니다: {variant!r}")
         self.variant = variant
@@ -238,6 +262,8 @@ class Strategy:
         self.entries = entries_done
         self.realized_pnl = realized_pnl   # 그날 청산된 거래 손익 합(USD)
         self.position: str | None = None
+        self.trend_entry = trend_entry
+        self.latest_row: Row | None = None
         self._last_start: datetime | None = None
 
     @property
@@ -249,6 +275,7 @@ class Strategy:
         decision = Decision()
         done = confirmed(bars, now)
         rows = analyze(done)
+        self.latest_row = rows[-1] if rows else None
         new = [r for r in rows if self._last_start is None or r.bar.start > self._last_start]
         for index, row in enumerate(new):
             latest = index == len(new) - 1
@@ -256,7 +283,11 @@ class Strategy:
             if row.cross and row.bar.start >= self.session.open:
                 decision.events.append({"type": "CROSS", "side": row.cross, "bar_start": row.bar.start.isoformat(),
                                         "atr": row.atr, "atr_ratio": row.atr_ratio, "latest": latest})
-            if latest and row.cross:
+            if latest and self.trend_entry and self.position is None:
+                entry = self.entry_on_trend(row, now)
+                decision.events.extend(entry.events)
+                decision.action, decision.row, decision.levels = entry.action, entry.row, entry.levels
+            elif latest and row.cross:
                 self._decide(row, decision)
             self._last_start = row.bar.start
         return decision
@@ -269,7 +300,7 @@ class Strategy:
                 decision.action = Action.EXIT
                 decision.row = row
                 decision.events.append({"type": "EXIT_SIGNAL", "reason": REVERSE, "position": self.position,
-                                        "cross": side, "note": "반대 교차 → 청산만, 반대 진입 없음"})
+                                        "cross": side, "note": "반대 교차 → 우선 청산, 청산 확인 뒤 재진입 옵션 판정"})
             return
 
         def skip(reason: str, **extra: Any) -> None:
@@ -281,7 +312,7 @@ class Strategy:
             return  # 장 시작 전 봉(지표 미리 채우기용)은 판단하지 않습니다
         if bar.end > self.session.entry_cutoff:
             return skip("OUTSIDE_ENTRY_WINDOW", entry_cutoff=self.session.entry_cutoff.isoformat())
-        if self.entries >= settings.MAX_ENTRIES_PER_DAY:
+        if settings.ENFORCE_ENTRY_LIMITS and self.entries >= settings.MAX_ENTRIES_PER_DAY:
             return skip("MAX_ENTRIES", entries=self.entries)
         if self.loss_limit_hit:
             return skip("DAILY_LOSS_LIMIT", realized_pnl=round(self.realized_pnl, 2),
@@ -312,6 +343,30 @@ class Strategy:
 
     # ── 결과 통지 ───────────────────────────────────────────
 
+    def entry_on_trend(self, row: Row, now: datetime) -> Decision:
+        """포지션이 없으면 최신 확정봉의 EMA 배열 방향으로 진입합니다."""
+        decision = Decision()
+        if not self.trend_entry or self.position is not None:
+            return decision
+        if not row.bar.end <= now < row.bar.end + timedelta(minutes=settings.BAR_MINUTES):
+            decision.events.append({"type": "SKIP", "reason": "STALE_TREND_BAR",
+                                    "bar_start": row.bar.start.isoformat()})
+            return decision
+        if row.ema_fast is None or row.ema_slow is None or row.ema_fast == row.ema_slow:
+            return decision
+        side = LONG if row.ema_fast > row.ema_slow else SHORT
+        self._decide(replace(row, cross=side), decision)
+        for event in decision.events:
+            event["entry_mode"] = "EMA_TREND"
+        return decision
+
+    def entry_after_close(self, row: Row) -> Decision:
+        """청산이 확인된 뒤 같은 교차 봉으로 신규 진입 조건을 다시 판정합니다."""
+        decision = Decision()
+        if self.position is None:
+            self._decide(row, decision)
+        return decision
+
     def on_entry_filled(self, side: str) -> None:
         self.position = side
         self.entries += 1
@@ -321,7 +376,7 @@ class Strategy:
 
     @property
     def loss_limit_hit(self) -> bool:
-        return self.realized_pnl <= -settings.DAILY_LOSS_LIMIT_USD
+        return settings.ENFORCE_ENTRY_LIMITS and self.realized_pnl <= -settings.DAILY_LOSS_LIMIT_USD
 
     def on_closed(self, pnl_usd: float | None = None) -> None:
         self.position = None

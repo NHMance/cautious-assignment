@@ -47,6 +47,15 @@ def _mode(args: argparse.Namespace) -> str:
     return "dry-run" if args.dry_run else "live"
 
 
+def _parse_hhmm(value: str) -> time:
+    try:
+        if len(value) != 5:
+            raise ValueError
+        return datetime.strptime(value, "%H:%M").time()
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("강제 청산 시각은 HH:MM 형식이어야 합니다") from exc
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="3주차 MKU EMA 교차 + ATR 검증 봇 (A 기본형 / B 개선형)")
     ap.add_argument("--strategy", required=True, choices=["A", "B", "AB"],
@@ -58,12 +67,48 @@ def main(argv: list[str] | None = None) -> int:
                     help=f"운영 시간(한국시간). 비우면 {settings.SESSION_OPEN}-{settings.SESSION_CLOSE}")
     ap.add_argument("--no-ws", action="store_true", help="실시간 체결(웹소켓) 없이 REST 현재가만")
     ap.add_argument("--symbol", default=settings.SYMBOL)
+    ap.add_argument("--bar-minutes", type=int, choices=(1, 5), default=settings.BAR_MINUTES,
+                    help="EMA·ATR 계산용 확정봉 간격 (기본: 5분)")
+    ap.add_argument("--no-entry-limits", action="store_true",
+                    help="진입 횟수·일일 손실 제한 해제 (손절·익절·주문 정합성 확인 유지)")
+    ap.add_argument("--reverse-on-cross", action="store_true",
+                    help="A 전용: 반대 EMA 교차 시 청산 확인 후 반대 방향으로 1계약 진입")
+    ap.add_argument("--trend-entry", action="store_true",
+                    help="A 전용: 포지션이 없으면 최신 확정봉 EMA 방향으로 진입·재진입 (반전 진입 포함)")
+    ap.add_argument("--duration-minutes", type=int, metavar="MINUTES",
+                    help="A의 신규 진입 허용 시간. 기본은 시간 종료 후 청산, --force-close-at 사용 시 해당 시각까지 감시")
+    ap.add_argument("--force-close-at", type=_parse_hhmm, metavar="HH:MM",
+                    help="--session 또는 --duration-minutes와 함께 사용: 한국시간 HH:MM에 신규 진입 중단·보유분 강제 청산")
     args = ap.parse_args(argv)
 
     if args.replay_date and args.bot_test:
         print("--replay-date 와 --bot-test 는 함께 쓸 수 없습니다.")
         return 2
     mode = _mode(args)
+    if args.reverse_on_cross and args.strategy != "A":
+        ap.error("--reverse-on-cross 는 --strategy A 전용입니다")
+    if args.trend_entry and args.strategy != "A":
+        ap.error("--trend-entry 는 --strategy A 전용입니다")
+    args.reverse_on_cross = args.reverse_on_cross or args.trend_entry
+    if args.force_close_at is not None and args.duration_minutes is None:
+        if not args.session or args.strategy != "A" or args.replay_date:
+            ap.error("--force-close-at 는 A의 --session 또는 --duration-minutes 와 함께 사용하세요")
+        try:
+            planned = Session.of(datetime.now(tz=KST).date(), *args.session).with_liquidation(args.force_close_at)
+            if mode != "bot-test" and datetime.now(tz=KST) >= planned.force_close:
+                raise ValueError("오늘의 강제 청산 시각이 이미 지났습니다")
+        except ValueError as exc:
+            ap.error(str(exc))
+    if args.duration_minutes is not None:
+        if args.duration_minutes <= 0:
+            ap.error("--duration-minutes 는 1분 이상이어야 합니다")
+        if args.strategy != "A" or args.replay_date or args.session:
+            ap.error("--duration-minutes 는 --strategy A 전용이며 --replay-date·--session 과 함께 쓸 수 없습니다")
+        if mode != "bot-test":
+            try:
+                Session.for_duration(datetime.now(tz=KST), args.duration_minutes, liquidate_at=args.force_close_at)
+            except ValueError as exc:
+                ap.error(str(exc))
     if args.strategy == "AB" and mode in ("live", "dry-run"):
         print("실시간은 A 와 B 를 각자 터미널에서 돌립니다: --strategy A / --strategy B")
         return 2
@@ -79,6 +124,16 @@ def main(argv: list[str] | None = None) -> int:
             print(f"리플레이할 수 없습니다: {problem}")
             return 2
 
+    original = settings.BAR_MINUTES, settings.ENFORCE_ENTRY_LIMITS
+    try:
+        settings.BAR_MINUTES = args.bar_minutes
+        settings.ENFORCE_ENTRY_LIMITS = not args.no_entry_limits
+        return _run_strategies(args, mode, day)
+    finally:
+        settings.BAR_MINUTES, settings.ENFORCE_ENTRY_LIMITS = original
+
+
+def _run_strategies(args: argparse.Namespace, mode: str, day: date | None) -> int:
     if args.strategy == "B":
         return run_b(mode, day or _today(args))
     code = run_a(args, mode, day)
@@ -168,7 +223,11 @@ def run_a(args: argparse.Namespace, mode: str, day: date | None) -> int:
         from trader.market import OverseasMarket, session_for
 
         clock = RealClock()
-        sess = session_for(clock.now(), hours, trade_end)
+        sess = (Session.for_duration(clock.now(), args.duration_minutes, liquidate_at=args.force_close_at)
+                if args.duration_minutes is not None
+                else session_for(clock.now(), hours, trade_end))
+        if args.duration_minutes is None and args.force_close_at is not None:
+            sess = sess.with_liquidation(args.force_close_at)
         journal = DayJournal(args.symbol, sess.open.date(), clock=clock, root=root_for("A", mode))
         market = OverseasMarket(args.symbol)
         if not args.no_ws:
@@ -176,10 +235,18 @@ def run_a(args: argparse.Namespace, mode: str, day: date | None) -> int:
             market.feed = feed
         print(f"장: {sess.open:%m-%d %H:%M} ~ {sess.close:%m-%d %H:%M} · 신규 진입 마감 {sess.entry_cutoff:%H:%M} · "
               f"강제 청산 {sess.force_close:%H:%M} · 기록 {journal.path()}")
+        print(f"확정 {settings.BAR_MINUTES}분봉 EMA {settings.EMA_FAST}/{settings.EMA_SLOW} · ATR 진입 필터 없음 · "
+              f"진입 횟수·일일 손실 제한 {'적용' if settings.ENFORCE_ENTRY_LIMITS else '해제'} · "
+              f"손절 ATR×{settings.STOP_ATR} · 익절 ATR×{settings.TAKE_ATR} · {settings.MAX_QTY}계약")
+        print(f"진입 방식: {'EMA 배열 방향 진입·손절/익절 후 재진입' if args.trend_entry else 'EMA 교차 신호'} · "
+              f"반대 교차 후 반전 진입: {'사용' if args.reverse_on_cross else '미사용'}")
         bot = TraderBot(symbol=args.symbol, market=market,
                         broker=OverseasBroker(args.symbol, journal, clock, dry_run=mode == "dry-run"),
                         journal=journal, clock=clock, session=sess, environment="paper",
-                        extra_start={"realtime": not args.no_ws})
+                        extra_start={"realtime": not args.no_ws, "duration_minutes": args.duration_minutes,
+                                     "reverse_on_cross": args.reverse_on_cross, "trend_entry": args.trend_entry},
+                        close_on_deadline=args.duration_minutes is not None, reverse_on_cross=args.reverse_on_cross,
+                        trend_entry=args.trend_entry)
         reason = bot.run()
         if reason == "NOT_TODAY":
             print(f"오늘 장({sess.close:%H:%M} 마감)이 이미 끝났습니다.")
@@ -253,6 +320,10 @@ def _run_a_bot_test(args: argparse.Namespace) -> int:
     logging.getLogger("backend").setLevel(logging.ERROR)
     day = datetime.strptime(settings.BOT_TEST_DATE, "%Y%m%d").date()
     sess = Session.of(day, *(args.session or tuple(time.fromisoformat(t) for t in settings.BOT_TEST_SESSION)))
+    if args.duration_minutes is not None:
+        sess = Session.for_duration(sess.open, args.duration_minutes, liquidate_at=args.force_close_at)
+    elif args.force_close_at is not None:
+        sess = sess.with_liquidation(args.force_close_at)
     bars_5m, bars_1m = make_day(sess)
     return _run_sim(args, "bot-test", sess, bars_5m, bars_1m)
 
@@ -266,10 +337,15 @@ def _run_sim(args: argparse.Namespace, mode: str, sess: Session, bars_5m: list[A
     journal = DayJournal(args.symbol, sess.open.date(), clock=clock, root=root_for("A", mode))
     journal.path().unlink(missing_ok=True)  # 다시 돌리면 새로 씁니다(지난 실행의 진입 횟수를 되살리지 않게)
     print(f"[A] {mode}: 장 {sess.open:%m-%d %H:%M} ~ {sess.close:%m-%d %H:%M} · 진입 마감 {sess.entry_cutoff:%H:%M} · "
-          f"강제 청산 {sess.force_close:%H:%M} · 5분봉 {len(bars_5m)}개(미리 채우기 포함) · 1분봉 {len(bars_1m)}개")
+          f"강제 청산 {sess.force_close:%H:%M} · 지표용 {settings.BAR_MINUTES}분봉 {len(bars_5m)}개(미리 채우기 포함) · "
+          f"시세용 1분봉 {len(bars_1m)}개")
     bot = TraderBot(symbol=args.symbol, market=HistoricalMarket(bars_5m, bars_1m, clock),
                     broker=OverseasBroker(args.symbol, journal, clock, dry_run=True),
-                    journal=journal, clock=clock, session=sess, environment=mode)
+                    journal=journal, clock=clock, session=sess, environment=mode,
+                    extra_start={"duration_minutes": args.duration_minutes, "reverse_on_cross": args.reverse_on_cross,
+                                 "trend_entry": args.trend_entry},
+                    close_on_deadline=args.duration_minutes is not None, reverse_on_cross=args.reverse_on_cross,
+                    trend_entry=args.trend_entry)
     bot.journal.echo = False
     bot.run()
     closed = [r for r in journal.today() if r.get("type") == "TRADE_CLOSED"]

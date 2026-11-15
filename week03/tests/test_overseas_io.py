@@ -12,6 +12,7 @@ from bot.clock import KST, SimClock
 from trader import broker as broker_mod
 from trader import market as market_mod
 from trader import recompute
+from trader import settings
 from trader.journal import DayJournal
 from trader.strategy import LONG, SHORT
 
@@ -91,3 +92,18 @@ def test_b_follow_mode_stops_at_a_run_end(tmp_path):
     src.write_text("".join(json.dumps(x) + "\n" for x in lines))
     engine = recompute.run(src, tmp_path / "B", follow=True)
     assert engine.finished
+
+
+def test_runtime_bar_minutes_reach_rest_request_and_parser(monkeypatch):
+    monkeypatch.setattr(settings, "BAR_MINUTES", 1)
+    requests = []
+    def chart(symbol, **kwargs):
+        requests.append(kwargs)
+        return {"Occurs1": [{"occurs1_ref_dt": "20261103", "occurs1_exch_tm": "091000",
+                             "occurs1_open_pric": "0.7500", "occurs1_high_pric": "0.7502",
+                             "occurs1_low_pric": "0.7499", "occurs1_close_pric": "0.7501"}]}
+    monkeypatch.setattr(market_mod.api, "chart_minute", chart)
+    monkeypatch.setattr(market_mod, "save_sample", lambda *a, **kw: None)
+    bars = market_mod.OverseasMarket().fetch_bars(date(2026, 11, 3), date(2026, 11, 3))
+    assert requests[0]["dcnt"] == "1"
+    assert (bars[0].end - bars[0].start).total_seconds() == 60
