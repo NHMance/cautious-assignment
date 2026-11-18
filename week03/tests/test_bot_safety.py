@@ -1,7 +1,9 @@
 """주문 한 건(접수 → 체결 → 잔고)이 어긋날 때와 예상 못한 예외 — 서버·인증 없음."""
 from __future__ import annotations
 
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
+from types import SimpleNamespace
+import pytest
 
 from bot.broker import Fill, Position  # week02
 from bot.clock import KST, SimClock
@@ -10,7 +12,7 @@ from trader import broker as broker_mod
 from trader import settings
 from trader.bot import TraderBot, count_entries, pnl_for_limit
 from trader.journal import DayJournal
-from trader.strategy import LONG, SHORT, Session, Trade, levels
+from trader.strategy import LONG, SHORT, Action, Bar, Decision, Row, Session, Trade, levels
 
 DAY = date(2026, 11, 3)
 ATR = 0.0004
@@ -275,3 +277,174 @@ def test_count_entries_and_pnl_for_limit():
     assert count_entries(old) == 2           # 부분 체결도 진입으로 셈
     assert pnl_for_limit({"pnl_usd": -5.0}) == -5.0
     assert pnl_for_limit({"pnl_usd": None, "pnl_for_limit_usd": -7.5}) == -7.5
+
+
+def test_entry_limits_disabled_in_order_checks(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "ENFORCE_ENTRY_LIMITS", False)
+    bot = make_bot(tmp_path)
+    bot.strategy.entries = 100
+    bot.strategy.realized_pnl = -1000
+    row = SimpleNamespace(bar=SimpleNamespace(start=bot.clock.now()), atr=ATR)
+    bot.enter(LONG, row)
+    assert bot.broker.submitted == [(LONG, 1)]
+    assert bot.trade is not None and bot.trade.stop < bot.trade.entry_price
+
+
+def test_unlimited_mode_still_blocks_pending_orders(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "ENFORCE_ENTRY_LIMITS", False)
+    bot = make_bot(tmp_path)
+    bot.broker.pending = 1
+    bot.enter(LONG, SimpleNamespace(bar=SimpleNamespace(start=bot.clock.now()), atr=ATR))
+    assert not bot.broker.submitted
+    assert rows(bot, "RISK_BLOCK")[-1]["check"] == "NO_PENDING"
+
+
+def test_one_minute_fetch_schedule(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "BAR_MINUTES", 1)
+    bot = make_bot(tmp_path)
+    now = bot.clock.now().replace(second=6)
+    assert bot._next_fetch(now) == now.replace(second=5) + timedelta(minutes=1)
+
+
+def test_duration_run_closes_at_deadline_not_thirty_minutes_early(tmp_path):
+    bot = make_bot(tmp_path)
+    start = bot.clock.now()
+    bot.session = Session.for_duration(start, 180)
+    bot.strategy.session = bot.session
+    bot.close_on_deadline = True
+    bot.trade = long_trade()
+    bot.broker.held = Position(LONG, 1, 0.7500)
+    assert bot.run() == "DEADLINE"
+    closed = rows(bot, "TRADE_CLOSED")
+    assert len(closed) == 1 and closed[0]["reason"] == "FORCE"
+    assert datetime.fromisoformat(closed[0]["ts"]) >= start + timedelta(hours=3)
+    assert bot.broker.held is None
+
+
+def test_stop_is_kept_when_entry_limits_disabled(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "ENFORCE_ENTRY_LIMITS", False)
+    bot = make_bot(tmp_path)
+    bot.trade = long_trade()
+    bot.broker.held = Position(LONG, 1, 0.7500)
+    bot.market.price = bot.trade.stop
+    bot.watch_exit(bot.clock.now())
+    assert rows(bot, "TRADE_CLOSED")[-1]["reason"] == "STOP"
+    assert bot.broker.held is None
+
+
+def test_fixed_session_waits_then_liquidates_at_1750_and_ends_at_1800(tmp_path):
+    bot = make_bot(tmp_path, start=datetime(2026, 11, 3, 14, 50, tzinfo=KST))
+    bot.session = Session.of(DAY, time(15), time(18)).with_liquidation(time(17, 50))
+    bot.strategy.session = bot.session
+    bot.trade = long_trade()
+    bot.broker.held = Position(LONG, 1, 0.7500)
+    assert bot.run() == "DEADLINE"
+    assert rows(bot, "WAIT_OPEN")
+    closed = rows(bot, "TRADE_CLOSED")
+    assert len(closed) == 1 and closed[0]["reason"] == "FORCE"
+    assert datetime.fromisoformat(closed[0]["ts"]) == datetime(2026, 11, 3, 17, 50, tzinfo=KST)
+    assert bot.clock.now() == datetime(2026, 11, 3, 18, tzinfo=KST)
+    assert bot.broker.held is None
+
+
+def reversal_bot(tmp_path):
+    bot = make_bot(tmp_path)
+    bot.reverse_on_cross = True
+    bot.trade = long_trade()
+    bot.strategy.restore_position(LONG)
+    bot.broker.held = Position(LONG, 1, 0.7500)
+    now = bot.clock.now()
+    bar = Bar(now - timedelta(minutes=1), now, 0.7500, 0.7502, 0.7498, 0.7500)
+    row = Row(bar, 0.7499, 0.7500, ATR, ATR, SHORT)
+    bot.strategy.on_bars = lambda *args: Decision(action=Action.EXIT, row=row)
+    return bot
+
+
+def test_reverse_cross_closes_then_enters_opposite_once(tmp_path):
+    bot = reversal_bot(tmp_path)
+    bot.on_bar_tick(bot.clock.now())
+    assert bot.broker.submitted == [(SHORT, 1), (SHORT, 1)]  # 청산 1계약 → 신규 1계약
+    assert bot.trade is not None and bot.trade.side == SHORT
+    assert bot.strategy.position == SHORT
+    assert bot._pending_reversal is None
+    events = bot.journal.today()
+    assert next(i for i, r in enumerate(events) if r["type"] == "TRADE_CLOSED") < next(
+        i for i, r in enumerate(events) if r["type"] == "ENTRY_OPEN")
+    assert rows(bot, "ENTRY_SIGNAL")[-1]["reversal"] is True
+
+
+def test_reverse_waits_for_failed_exit_and_retries_after_confirmed_close(tmp_path):
+    bot = reversal_bot(tmp_path)
+    wait_fill = bot.broker.wait_fill
+    bot.broker.wait_fill = lambda *args, **kwargs: None
+    bot.on_bar_tick(bot.clock.now())
+    assert bot.broker.submitted == [(SHORT, 1)]
+    assert bot.trade.side == LONG and bot._pending_reversal is not None
+    bot.broker.wait_fill = wait_fill
+    bot.watch_exit(bot.clock.now())
+    assert bot.broker.submitted == [(SHORT, 1), (SHORT, 1), (SHORT, 1)]
+    assert bot.trade.side == SHORT
+    assert len(rows(bot, "ENTRY_OPEN")) == 1
+
+
+def test_reversal_with_pending_order_never_opens_opposite(tmp_path):
+    bot = reversal_bot(tmp_path)
+    bot.broker.pending = 1
+    bot.on_bar_tick(bot.clock.now())
+    assert not bot.broker.submitted
+    assert bot.trade.side == LONG
+
+
+def test_reversal_respects_1750_cutoff(tmp_path):
+    bot = reversal_bot(tmp_path)
+    bot.session = Session.of(DAY, time(9), time(18)).with_liquidation(time(17, 50))
+    bot.strategy.session = bot.session
+    bot.clock.sleep((bot.session.entry_cutoff - bot.clock.now()).total_seconds())
+    bot.on_bar_tick(bot.clock.now())
+    assert bot.trade is None
+    assert bot.broker.submitted == [(SHORT, 1)]
+    assert rows(bot, "SKIP")[-1]["reason"] == "REVERSAL_EXPIRED"
+
+
+def test_default_exit_only_mode_is_unchanged(tmp_path):
+    bot = reversal_bot(tmp_path)
+    bot.reverse_on_cross = False
+    bot.on_bar_tick(bot.clock.now())
+    assert bot.trade is None and bot.strategy.position is None
+    assert bot.broker.submitted == [(SHORT, 1)]
+
+
+@pytest.mark.parametrize("reason", ["STOP", "TAKE"])
+def test_trend_reentry_after_stop_or_take_without_waiting_for_cross(tmp_path, reason):
+    bot = make_bot(tmp_path)
+    bot.strategy.trend_entry = True
+    bot.trade = long_trade()
+    bot.strategy.restore_position(LONG)
+    bot.broker.held = Position(LONG, 1, 0.7500)
+    now = bot.clock.now()
+    bar = Bar(now - timedelta(minutes=1), now, 0.7500, 0.7502, 0.7498, 0.7500)
+    bot.strategy.latest_row = Row(bar, 0.7502, 0.7500, ATR, ATR, None)
+    bot.market.price = bot.trade.stop if reason == "STOP" else bot.trade.take
+    bot.watch_exit(now)
+    assert rows(bot, "TRADE_CLOSED")[-1]["reason"] == reason
+    assert bot.broker.submitted == [(SHORT, 1), (LONG, 1)]
+    assert bot.trade is not None and bot.trade.side == LONG
+    assert rows(bot, "ENTRY_SIGNAL")[-1]["reentry"] is True
+    bot.watch_exit(now)
+    assert bot.broker.submitted == [(SHORT, 1), (LONG, 1)]
+
+
+def test_trend_reentry_stops_at_cutoff_and_with_pending_orders(tmp_path):
+    bot = make_bot(tmp_path)
+    bot.strategy.trend_entry = True
+    now = bot.clock.now()
+    bar = Bar(now - timedelta(minutes=1), now, 0.7500, 0.7502, 0.7498, 0.7500)
+    bot.strategy.latest_row = Row(bar, 0.7502, 0.7500, ATR, ATR, None)
+    bot.broker.pending = 1
+    bot._try_trend_entry()
+    assert not bot.broker.submitted
+    assert rows(bot, "RISK_BLOCK")[-1]["check"] == "NO_PENDING"
+    bot.broker.pending = 0
+    bot.clock.sleep((bot.session.entry_cutoff - now).total_seconds())
+    bot._try_trend_entry()
+    assert not bot.broker.submitted

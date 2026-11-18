@@ -206,6 +206,43 @@ uv run --group dashboard uvicorn frontend.app:app --port 8001
 - 밤새 돌아가므로 노트북이 잠들지 않게 전원 연결 + `caffeinate -i` 를 함께 켜 둡니다.
 - `--no-ws` : 웹소켓 없이 REST 현재가만 씁니다. `--symbol MKUZ26` : 다른 종목코드로.
 
+**1분봉 EMA 9/21 · 진입 제한 해제 · 3시간 모의계좌 실행**
+
+```bash
+caffeinate -i uv run python -m trader.main --strategy A --bar-minutes 1 --no-entry-limits --duration-minutes 180
+```
+
+- 확정 1분봉으로 EMA 9/21·ATR을 계산합니다. A이므로 ATR 비율 진입 필터는 적용하지 않습니다.
+- 하루 진입 횟수·일일 손실 제한을 해제합니다. 1계약, 손절 ATR×1.5·익절 ATR×2, 반대 교차 시 청산은 유지합니다.
+- 인증 후 운영 시간을 정하는 시점부터 180분 동안 실행합니다. 기존 45분 전 진입 중단·30분 전 강제 청산은 적용하지 않습니다.
+- 180분 후 신규 진입을 중단하고 보유분 청산을 시도합니다. 청산 실패 시 약 60초 동안 재시도하며, API 처리 시간에 따라 종료가 늦어질 수 있습니다. 미정리 시 `POSITION_LEFT`와 화면 경고를 남깁니다.
+- 잔고·미체결·주문가능수량 확인과 중복 주문 방지는 유지합니다. `--dry-run`을 추가하면 주문 없이 동작합니다.
+- 기본 실행 설정은 바뀌지 않으며 선택한 설정은 `RUN_START.settings`에 기록됩니다. 거래 기회와 손실이 함께 늘 수 있으며 수익 극대화를 검증한 설정은 아닙니다.
+
+운영 시간을 **한국시간 15:00~18:00**, 보유분 강제 청산을 **17:50**으로 고정하려면 다음과 같이 실행합니다.
+
+```bash
+caffeinate -i uv run python -m trader.main --strategy A --bar-minutes 1 --no-entry-limits --session 15:00-18:00 --force-close-at 17:50
+```
+
+15:00 전에 실행하면 시작 시각까지 기다립니다. 15:00~17:50에 신규 진입을 허용하며 손절·익절·반대 교차 청산을 감시합니다. 17:50에는 신규 진입을 중단하고 남은 보유분을 강제 청산 시도하며, 18:00까지 청산 확인·재시도 후 종료합니다. 17:50이 이미 지난 경우 실행을 거절합니다.
+
+반대 EMA 교차에서 청산 후 반대 방향으로 진입하려면 A에 `--reverse-on-cross`를 추가합니다.
+
+```bash
+caffeinate -i uv run python -m trader.main --strategy A --symbol MKUX26 --bar-minutes 1 --no-entry-limits --reverse-on-cross --session 15:00-18:00 --force-close-at 17:50
+```
+
+청산 확인 후 잔고·미체결을 다시 확인해 반대 방향 1계약을 주문하고, 새 체결가와 신호 봉 ATR로 손절·익절을 설정합니다. 청산이 지연되면 확인 후 재진입을 시도하되, 다음 봉 마감에 도달한 신호나 17:50 이후에는 재진입하지 않습니다. 옵션을 생략하면 기존의 청산만 하는 동작을 유지합니다. 실행 중인 봇에는 코드 수정이 자동 반영되지 않으므로 기존 봇을 중단한 뒤 재시작해야 합니다. 중단 자체로 보유분을 자동 청산하지는 않습니다.
+
+새 교차를 기다리지 않고 **포지션이 없으면 현재 EMA 방향으로 진입·재진입**하려면 `--trend-entry`를 사용합니다. 이 옵션은 반대 교차 시 청산 후 반전 진입도 포함합니다.
+
+```bash
+caffeinate -i uv run python -m trader.main --strategy A --symbol MKUX26 --bar-minutes 1 --no-entry-limits --trend-entry --session 15:00-18:00 --force-close-at 17:50
+```
+
+최신 확정 1분봉에서 EMA 9가 EMA 21보다 높으면 매수, 낮으면 매도합니다. 손절·익절로 청산된 뒤에도 최신 봉이 유효하면 같은 규칙으로 다시 진입하고, 오래된 봉이면 새 봉을 기다립니다. 두 EMA가 같거나 ATR 손절 거리가 1틱 미만이면 진입하지 않습니다. 보유·미체결이 남은 상태에서는 추가 진입하지 않으며, 17:50부터 신규 진입을 중단하고 강제 청산합니다. 교차 방식보다 반복 진입과 거래비용이 늘 수 있습니다. 실행 중인 봇을 중단한 뒤 위 명령으로 재시작해야 적용됩니다.
+
 | 시각 | 봇이 하는 일 | 터미널에서 볼 이벤트 | 할 일 |
 | --- | --- | --- | --- |
 | 20:50 전 | 시작, 잔고·미체결·오늘 진입 횟수 복구 후 대기 | `RUN_START`, `RECOVER`, `WAIT_OPEN` | `environment: paper` 확인 |
@@ -231,13 +268,14 @@ uv run --group dashboard uvicorn frontend.app:app --port 8001
 | --- | --- | --- |
 | `SYMBOL` / `EXCH_CD` | `MKUX26` / `FSGX` | 종목코드, 거래소코드 |
 | `TICK` / `TICK_VALUE` | 0.0001 / 2.5 USD | 호가단위, 1틱 손익 |
-| `BAR_MINUTES` | 5 | 봉 길이(분) |
+| `BAR_MINUTES` | 5 | 봉 길이(분), `--bar-minutes 1`로 1분봉 선택 |
 | `EMA_FAST` / `EMA_SLOW` | 9 / 21 | 교차 EMA |
 | `ATR_PERIOD` / `ATR_BASE_BARS` | 14 (Wilder) / 20 | ATR, 기준값 = 직전 20개 봉 ATR 평균 |
 | `ATR_BAND` | (0.90, 1.30) | **B 만**: ATR 비율이 이 범위(양끝 포함)여야 진입 |
 | `PRELOAD_DAYS` | 5 | 지표 미리 채우기로 거슬러 받을 날 수 |
 | `STOP_ATR` / `TAKE_ATR` | 1.5 / 2.0 | 손절·익절 거리 = 진입 당시 ATR × 값 |
 | `MAX_QTY` / `MAX_ENTRIES_PER_DAY` | 1 / 5 | 계약 수, 하루 진입 횟수 |
+| `ENFORCE_ENTRY_LIMITS` | True | `--no-entry-limits` 사용 시 False: 진입 횟수·일일 손실 제한 해제 |
 | `DAILY_LOSS_LIMIT_USD` | 25.0 | 그날 청산된 거래 손익 합이 -25 USD 이하면 신규 진입 중단 (`SKIP`/`RISK_BLOCK` `DAILY_LOSS_LIMIT`). 보유 포지션은 손절·익절·강제 청산 규칙대로. **진입 전에만 판정하므로 하루 손실은 -25 를 넘을 수 있음** |
 | `MAX_CONSECUTIVE_LOOP_ERRORS` | 10 | 루프 예외가 연속 이만큼이면 멈춤(그 전까지는 기록하고 이어 감) |
 | `EXIT_PENDING_WAIT_ATTEMPTS` | 3 | 청산 전 미체결이 남아 있을 때 기다리는 횟수(감시 주기 2초) — 넘으면 미체결 취소 |

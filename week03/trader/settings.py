@@ -29,6 +29,7 @@ STOP_ATR = 1.5               # 손절 거리 = 진입 당시 ATR × 1.5
 TAKE_ATR = 2.0               # 익절 거리 = 진입 당시 ATR × 2
 MAX_QTY = 1
 MAX_ENTRIES_PER_DAY = 5
+ENFORCE_ENTRY_LIMITS = True  # --no-entry-limits: 진입 횟수·일일 손실 제한만 해제
 DAILY_LOSS_LIMIT_USD = 25.0   # 그날 실현 손익 합이 -25 USD 이하가 되면 신규 진입 중단 (보유분 청산 규칙은 그대로)
 EST_ROUNDTRIP_COST = 0.0     # 수수료는 손익에서 제외 (이슈 #3). 기록용 자리만 둡니다.
 

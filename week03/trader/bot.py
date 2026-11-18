@@ -34,7 +34,7 @@ from bot.clock import floor_to  # week02
 from bot.journal import Journal  # week02
 from bot.main import STOP_REASONS as _W2_REASONS, Bot as _W2Bot, StopSignal  # week02 — 종료 신호 처리 재사용
 from trader import settings
-from trader.strategy import FORCE, LONG, REVERSE, SHORT, STOP, TAKE, Action, Session, Strategy, Trade, levels
+from trader.strategy import FORCE, LONG, REVERSE, SHORT, STOP, TAKE, Action, Row, Session, Strategy, Trade, levels
 
 STOP_REASONS = {**_W2_REASONS, "DEADLINE": "장 마감 정상 종료", "NOT_TODAY": "오늘 장이 이미 끝났습니다"}
 
@@ -43,7 +43,9 @@ class TraderBot:
     variant = "A"
 
     def __init__(self, *, symbol: str, market: Any, broker: Any, journal: Journal, clock: Any,
-                 session: Session, environment: str, extra_start: dict[str, Any] | None = None) -> None:
+                 session: Session, environment: str, extra_start: dict[str, Any] | None = None,
+                 close_on_deadline: bool = False, reverse_on_cross: bool = False,
+                 trend_entry: bool = False) -> None:
         self.symbol = symbol
         self.market = market
         self.broker = broker
@@ -52,7 +54,10 @@ class TraderBot:
         self.session = session
         self.environment = environment
         self.extra_start = extra_start or {}
-        self.strategy = Strategy(self.variant, session)
+        self.close_on_deadline = close_on_deadline
+        self.reverse_on_cross = reverse_on_cross or trend_entry
+        self._pending_reversal: Row | None = None
+        self.strategy = Strategy(self.variant, session, trend_entry=trend_entry)
         self.journal.state = lambda: self.strategy.state
         self.trade: Trade | None = None
         self.exit_reason: str | None = None
@@ -91,6 +96,8 @@ class TraderBot:
                         raise
                     next_fetch = max(next_fetch, self.clock.now())
                     self.clock.sleep(settings.PRICE_POLL_SEC)
+            if self.close_on_deadline:
+                self._close_at_deadline()
         except KeyboardInterrupt:
             stop_reason, stop_detail = "CTRL_C", "사용자가 Ctrl+C 를 눌렀습니다"
         except StopSignal as exc:
@@ -115,6 +122,16 @@ class TraderBot:
                              interrupted=stop_reason not in ("DEADLINE", "NOT_TODAY"),
                              entries=self.strategy.entries, position=asdict(held) if held else None)
         return stop_reason
+
+    def _close_at_deadline(self) -> None:
+        """지정 시간 뒤 신규 판단 없이 잔고·미체결 확인을 거쳐 청산을 재시도합니다."""
+        retry_until = self.clock.now() + timedelta(seconds=60)
+        while self.trade is not None and self.clock.now() < retry_until:
+            self.watch_exit(self.clock.now())
+            if self.trade is not None:
+                self.clock.sleep(settings.PRICE_POLL_SEC)
+        if self.trade is not None:
+            _say("[경고] 시간 종료 후에도 청산을 확인하지 못했습니다. HTS/앱에서 잔고·미체결을 확인하세요.")
 
     def _step(self, next_fetch: datetime) -> datetime:
         """루프 한 바퀴: 봉 갱신 → 보유 감시 → 대기. 다음 봉 조회 시각을 돌려줍니다."""
@@ -191,11 +208,30 @@ class TraderBot:
         if self._pending_restore is not None and self._last_atr:
             self._restore_from(self._pending_restore)
         if decision.action is Action.EXIT and self.trade is not None:
+            if self.reverse_on_cross:
+                self._pending_reversal = decision.row
             self.exit_reason = REVERSE
             self.exit_attempts = 0
             self.exit(REVERSE, self._safe_price())
+            self._try_reversal()
         elif decision.action in (Action.ENTER_LONG, Action.ENTER_SHORT) and decision.row is not None:
             self.enter(LONG if decision.action is Action.ENTER_LONG else SHORT, decision.row)
+
+    def _try_reversal(self) -> None:
+        row = self._pending_reversal
+        if row is None or self.trade is not None or self.strategy.position is not None or self._pending_restore is not None:
+            return
+        self._pending_reversal = None  # 한 신호에서 신규 주문은 한 번만 시도합니다.
+        now = self.clock.now()
+        if now >= self.session.entry_cutoff or now >= row.bar.end + timedelta(minutes=settings.BAR_MINUTES):
+            self.journal.write("SKIP", reason="REVERSAL_EXPIRED", side=row.cross,
+                               bar_start=row.bar.start.isoformat())
+            return
+        decision = self.strategy.entry_after_close(row)
+        for event in decision.events:
+            self.journal.write(event.pop("type"), reversal=True, **event)
+        if decision.action in (Action.ENTER_LONG, Action.ENTER_SHORT):
+            self.enter(LONG if decision.action is Action.ENTER_LONG else SHORT, row)
 
     def _reconcile(self) -> None:
         """관리 중인 거래가 없는데 잔고에 포지션이 있으면 거둬서 관리합니다(체결 확인 실패·늦은 체결)."""
@@ -247,7 +283,7 @@ class TraderBot:
             failures.append({"check": "NO_PENDING", "value": pending})
         if orderable is None or orderable < settings.MAX_QTY:
             failures.append({"check": "ORDERABLE", "value": orderable, "limit": settings.MAX_QTY})
-        if self.strategy.entries >= settings.MAX_ENTRIES_PER_DAY:
+        if settings.ENFORCE_ENTRY_LIMITS and self.strategy.entries >= settings.MAX_ENTRIES_PER_DAY:
             failures.append({"check": "ENTRIES", "value": self.strategy.entries})
         if self.strategy.loss_limit_hit:
             failures.append({"check": "DAILY_LOSS_LIMIT", "value": round(self.strategy.realized_pnl, 2),
@@ -297,13 +333,30 @@ class TraderBot:
         if trade is None:
             return
         if now >= self.session.force_close and self.exit_reason != FORCE:
+            self._pending_reversal = None
             self.exit_reason = FORCE
             self.exit_attempts = 0
         price = self._safe_price()
         if self.exit_reason is None and price is not None:
             self.exit_reason = trade.trigger(price)
         if self.exit_reason is not None:
+            reason = self.exit_reason
             self.exit(self.exit_reason, price)
+            self._try_reversal()
+            if reason in (STOP, TAKE) and self.trade is None:
+                self._try_trend_entry()
+
+    def _try_trend_entry(self) -> None:
+        if self.trade is not None or self._pending_restore is not None or self.strategy.latest_row is None:
+            return
+        now = self.clock.now()
+        if now >= self.session.entry_cutoff:
+            return
+        decision = self.strategy.entry_on_trend(self.strategy.latest_row, now)
+        for event in decision.events:
+            self.journal.write(event.pop("type"), reentry=True, **event)
+        if decision.action in (Action.ENTER_LONG, Action.ENTER_SHORT) and decision.row is not None:
+            self.enter(LONG if decision.action is Action.ENTER_LONG else SHORT, decision.row)
 
     def exit(self, reason: str, trigger_price: float | None) -> None:
         trade = self.trade

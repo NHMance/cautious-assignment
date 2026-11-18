@@ -214,3 +214,64 @@ def test_on_closed_accumulates_realized_pnl():
     st.on_entry_filled(SHORT)
     st.on_closed(-10.0)
     assert st.realized_pnl == -25.0 and st.loss_limit_hit
+
+
+def test_unlimited_entries_ignore_count_and_daily_loss(monkeypatch):
+    monkeypatch.setattr(settings, "ENFORCE_ENTRY_LIMITS", False)
+    s = session()
+    st = Strategy("A", s, entries_done=100, realized_pnl=-1000)
+    bars = bars_from(flat_then(rising_after()), s.open - timedelta(minutes=5 * 60))
+    action, events, _ = feed_until_signal(st, bars)
+    assert action is Action.ENTER_LONG
+    assert not st.loss_limit_hit
+    assert not any(e.get("reason") in ("MAX_ENTRIES", "DAILY_LOSS_LIMIT") for e in events)
+
+
+def test_duration_session_allows_last_minute_and_roundtrips():
+    from bot.clock import KST
+    from trader.strategy import Decision, Row
+
+    start = datetime(2026, 11, 3, 23, 30, 17, tzinfo=KST)
+    s = Session.for_duration(start, 180)
+    assert s.close - s.open == timedelta(hours=3)
+    assert s.close.day == 4
+    assert s.entry_cutoff == s.force_close == s.close
+    assert Session.from_dict(s.to_dict()) == s
+    bar = Bar(s.close - timedelta(minutes=1, seconds=1), s.close - timedelta(seconds=1),
+              0.75, 0.7504, 0.7496, 0.7501)
+    decision = Decision()
+    Strategy("A", s)._decide(Row(bar, 0.7502, 0.7501, 0.0004, 0.0004, LONG), decision)
+    assert decision.action is Action.ENTER_LONG
+
+
+@pytest.mark.parametrize("fast,slow,action", [(0.7502, 0.7500, Action.ENTER_LONG),
+                                              (0.7498, 0.7500, Action.ENTER_SHORT)])
+def test_trend_mode_enters_without_cross_and_does_not_duplicate_bar(monkeypatch, fast, slow, action):
+    from trader import strategy as strategy_mod
+    from trader.strategy import Row
+    s = session()
+    now = s.open + timedelta(minutes=10)
+    bar = Bar(now - timedelta(minutes=1), now, 0.7500, 0.7502, 0.7498, 0.7500)
+    row = Row(bar, fast, slow, 0.0004, 0.0004, None)
+    monkeypatch.setattr(strategy_mod, "analyze", lambda bars: [row])
+    st = Strategy("A", s, trend_entry=True)
+    decision = st.on_bars([bar], now)
+    assert decision.action is action
+    assert not any(e["type"] == "CROSS" for e in decision.events)
+    assert any(e.get("entry_mode") == "EMA_TREND" for e in decision.events)
+    assert st.on_bars([bar], now).action is Action.NONE
+
+
+def test_trend_mode_rejects_stale_bar_equal_emas_and_existing_position(monkeypatch):
+    from trader.strategy import Row
+    from dataclasses import replace
+    monkeypatch.setattr(settings, "BAR_MINUTES", 1)
+    s = session()
+    now = s.open + timedelta(minutes=10)
+    bar = Bar(now - timedelta(minutes=1), now, 0.7500, 0.7502, 0.7498, 0.7500)
+    row = Row(bar, 0.7502, 0.7500, 0.0004, 0.0004, None)
+    st = Strategy("A", s, trend_entry=True)
+    assert st.entry_on_trend(row, now + timedelta(minutes=1)).action is Action.NONE
+    assert st.entry_on_trend(replace(row, ema_fast=row.ema_slow), now).action is Action.NONE
+    st.on_entry_filled(LONG)
+    assert st.entry_on_trend(row, now).action is Action.NONE

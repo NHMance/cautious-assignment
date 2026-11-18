@@ -41,7 +41,8 @@ def _first(row: dict[str, Any], names: tuple[str, ...]) -> str:
     return ""
 
 
-def parse_bars(raw: dict[str, Any], *, minutes: int = settings.BAR_MINUTES) -> list[Bar]:
+def parse_bars(raw: dict[str, Any], *, minutes: int | None = None) -> list[Bar]:
+    minutes = settings.BAR_MINUTES if minutes is None else minutes
     rows = raw.get("Occurs1")
     rows = rows if isinstance(rows, list) else []
     made: list[Bar] = []
@@ -113,8 +114,9 @@ class OverseasMarket:
 
     # ── 봉 ──────────────────────────────────────────────────
 
-    def fetch_bars(self, first: date, last: date, minutes: int = settings.BAR_MINUTES) -> list[Bar]:
+    def fetch_bars(self, first: date, last: date, minutes: int | None = None) -> list[Bar]:
         """first~last 의 분봉 전부(진행 중 봉 포함) 시간순."""
+        minutes = settings.BAR_MINUTES if minutes is None else minutes
         bars: dict[datetime, Bar] = {}
         next_key = api.FIRST_PAGE
         for _ in range(MAX_PAGES):

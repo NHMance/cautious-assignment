@@ -30,7 +30,8 @@ def _minute_bars(start: datetime, minutes: int, rng: random.Random, price: float
     return out, price
 
 
-def aggregate(bars_1m: list[Bar], minutes: int = settings.BAR_MINUTES) -> list[Bar]:
+def aggregate(bars_1m: list[Bar], minutes: int | None = None) -> list[Bar]:
+    minutes = settings.BAR_MINUTES if minutes is None else minutes
     groups: dict[datetime, list[Bar]] = {}
     for b in bars_1m:
         key = b.start.replace(minute=b.start.minute - b.start.minute % minutes, second=0, microsecond=0)
