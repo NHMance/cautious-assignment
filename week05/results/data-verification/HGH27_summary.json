@@ -1,0 +1,54 @@
+{
+  "checked_at": "2026-11-19T18:36:26.408874+09:00",
+  "expected": 1770,
+  "five_present": 1297,
+  "five_missing": 473,
+  "missing_with_minute_trades": 0,
+  "missing_without_minutes": 473,
+  "present_without_minutes": 0,
+  "volume_mismatches": 0,
+  "one_minute_records": 5493,
+  "minute_pages": 19,
+  "by_day": {
+    "2026-11-02": {
+      "expected": 177,
+      "missing": 72
+    },
+    "2026-11-03": {
+      "expected": 177,
+      "missing": 51
+    },
+    "2026-11-04": {
+      "expected": 177,
+      "missing": 23
+    },
+    "2026-11-05": {
+      "expected": 177,
+      "missing": 58
+    },
+    "2026-11-06": {
+      "expected": 177,
+      "missing": 30
+    },
+    "2026-11-09": {
+      "expected": 177,
+      "missing": 49
+    },
+    "2026-11-10": {
+      "expected": 177,
+      "missing": 61
+    },
+    "2026-11-11": {
+      "expected": 177,
+      "missing": 56
+    },
+    "2026-11-12": {
+      "expected": 177,
+      "missing": 36
+    },
+    "2026-11-13": {
+      "expected": 177,
+      "missing": 37
+    }
+  }
+}
