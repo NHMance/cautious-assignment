@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>구리선물 | 5주차 대시보드</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #f5f6f8; --panel: #fff; --line: #e3e6eb; --ink: #1b1f24; --muted: #6b7280;
+  --up: #d63b3b; --down: #2463d1; --accent: #0f766e; --ok: #15803d;
+  --rep: #4338ca; --rep-bg: #eef0ff; --live: #c2410c; --live-bg: #fff1e8;
+  --a: #2563eb; --b: #c2410c; --c: #0f766e; --extra: #a16207; --unlimited: #9333ea;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1115; --panel: #171a21; --line: #2a2f3a; --ink: #e6e8ec; --muted: #8b93a3;
+    --up: #f26b6b; --down: #5b8def; --accent: #2dd4bf; --ok: #4ade80;
+    --rep: #a5b4fc; --rep-bg: #1c1f3a; --live: #fb923c; --live-bg: #2a1a10;
+    --a: #60a5fa; --b: #fb923c; --c: #2dd4bf; --extra: #facc15; --unlimited: #c084fc;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Segoe UI", sans-serif; }
+header { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+h1 { font-size: 16px; margin: 0 8px 0 0; }
+h2 { font-size: 13px; color: var(--muted); font-weight: 600; margin: 0 0 10px; }
+p { margin: 0; color: var(--muted); }
+main { padding: 16px; }
+.tabs { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; padding: 0; margin: 0; }
+button { border: 0; background: transparent; color: var(--muted); padding: 6px 12px; font: inherit; cursor: pointer; }
+button[aria-pressed=true] { background: var(--ink); color: var(--panel); }
+button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+select { font: inherit; padding: 5px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+.controls { display: flex; flex-wrap: wrap; gap: 12px; margin-left: auto; }
+.controls label { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+.banner { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; border-left: 4px solid var(--rep); background: var(--rep-bg); color: var(--rep); }
+.banner.paper { border-color: var(--live); background: var(--live-bg); color: var(--live); }
+.status { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; padding: 0; margin: 0 0 8px; }
+.status li { font-size: 12px; color: var(--muted); padding: 4px 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+.status .ready { border-left: 3px solid var(--ok); }
+.status .pending { border-left: 3px solid var(--live); }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 16px; min-width: 0; }
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.card { border: 1px solid var(--line); border-top: 3px solid var(--strategy); border-radius: 8px; padding: 10px 12px; }
+.card > div:first-child { color: var(--strategy); font-weight: 600; }
+.card b { display: block; font-size: 22px; margin: 5px 0; font-variant-numeric: tabular-nums; }
+.data { font-size: 12px; color: var(--muted); }
+.pos { color: var(--up); }
+.neg { color: var(--down); }
+.scroll { overflow: auto; max-height: 420px; }
+table { width: 100%; border-collapse: collapse; white-space: nowrap; font-size: 12px; font-variant-numeric: tabular-nums; }
+th, td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+th:first-child, td:first-child { text-align: left; }
+th { color: var(--muted); font-weight: 500; position: sticky; top: 0; background: var(--panel); }
+[hidden] { display: none !important; }
+canvas { width: 100%; height: 280px; display: block; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; margin-bottom: 8px; }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; background: currentColor; margin-right: 5px; vertical-align: middle; }
+.notice { padding: 6px 0 12px; font-size: 12px; }
+.strategy-columns { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.strategy-column { min-width: 0; border-top: 4px solid var(--strategy); padding-top: 10px; }
+.strategy-column h2 { color: var(--strategy); font-size: 16px; }
+.strategy-column .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 12px; }
+.strategy-column .card { border-top: 1px solid var(--line); padding: 8px; }
+.strategy-column .card b { font-size: 17px; }
+.strategy-column canvas { height: 220px; }
+.strategy-column .panel { margin-bottom: 12px; }
+.strategy-column .panel h2 { font-size: 13px; color: var(--muted); }
+#extra { margin-top: 16px; }
+#extra summary { cursor: pointer; margin-bottom: 12px; color: var(--muted); }
+@media (max-width: 1100px) { .strategy-columns { grid-template-columns: 1fr; } }
+@media (max-width: 800px) { .split { grid-template-columns: 1fr; } .controls { margin-left: 0; } }
+@media (max-width: 540px) { main { padding: 10px; } .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+<h1>HG 구리선물 · A/B/C 대시보드</h1>
+<fieldset class="tabs" aria-label="결과 유형"><button id="replay" aria-pressed="true">과거 리플레이</button><button id="paper" aria-pressed="false">NH 모의계좌</button></fieldset>
+<div class="controls"><label>조회 범위 <select id="date"></select></label><label hidden id="strategy-filter">거래 내역 <select id="strategy"><option value="">모든 전략</option></select></label></div>
+</header>
+<main>
+<p id="subtitle" class="banner"></p>
+<div id="coverage"><ul id="status" class="status" aria-label="장별 데이터 상태"></ul><p id="baseline" class="data notice" hidden></p></div>
+<p id="empty" class="notice" role="status" hidden></p>
+<div id="content">
+<div id="columns" class="strategy-columns"></div>
+<details id="extra"><summary>추가 비교 · C-1 / 보유 제한 해제 A</summary><div id="extra-columns" class="strategy-columns"></div></details>
+</div>
+</main>
+<script id="data" type="application/json">__WEEK05_DATA__</script>
+<script>
+const data=JSON.parse(document.querySelector('#data').textContent);
+const $=id=>document.getElementById(id);
+const strategies=['A','B','C','C-1','A-unlimited'];
+const names={A:'추세 추종',B:'평균 회귀',C:'국면 적응','C-1':'고변동성 차단 해제','A-unlimited':'보유 제한 해제'};
+const colorKeys=['--a','--b','--c','--extra','--unlimited'];
+const theme=key=>getComputedStyle(document.documentElement).getPropertyValue(key).trim();
+const strategyColor=variant=>theme(colorKeys[strategies.indexOf(variant)]);
+const money=new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'});
+let mode='replay';
+function node(tag,label,cls){const n=document.createElement(tag);n.textContent=label;if(cls)n.className=cls;return n;}
+function options(select,values){select.replaceChildren(...values.map(([value,label])=>{const opt=node('option',label);opt.value=value;return opt;}));}
+function table(target,rows,columns,empty){
+  $(target).replaceChildren(...rows.map(row=>{const tr=node('tr','');row.forEach(value=>tr.append(node('td',value)));return tr;}));
+  if(!rows.length){const tr=node('tr','');const td=node('td',empty,'data');td.colSpan=columns;tr.append(td);$(target).append(tr);}
+}
+function stats(trades){let net=0,peak=0,mdd=0,wins=0;for(const t of trades){const v=Number(t.net);net+=v;peak=Math.max(peak,net);mdd=Math.max(mdd,peak-net);wins+=v>0;}return {net,mdd,wins,n:trades.length};}
+function chart(plot,trades,variants){
+  const dpr=window.devicePixelRatio||1,w=plot.clientWidth,h=220;
+  if(!w)return;
+  plot.width=w*dpr;plot.height=h*dpr;
+  const ctx=plot.getContext('2d');ctx.scale(dpr,dpr);ctx.font='12px system-ui';
+  const times=[...new Set(trades.map(t=>t.exit_at))];
+  const paths=variants.map(v=>{let pnl=0;const steps=new Map();for(const t of trades.filter(t=>t.strategy===v))steps.set(t.exit_at,(steps.get(t.exit_at)||0)+Number(t.net));return [0,...times.map(at=>pnl+=steps.get(at)||0)];});
+  const min=Math.min(-1,...paths.flat()),max=Math.max(1,...paths.flat());
+  const y=v=>12+(max-v)*(h-45)/(max-min),x=i=>64+(w-80)*i/Math.max(1,times.length);
+  for(const v of [min,(min+max)/2,max]){ctx.fillStyle=theme('--muted');ctx.fillText(money.format(v),0,y(v)+4);ctx.strokeStyle=theme('--line');ctx.beginPath();ctx.moveTo(63,y(v));ctx.lineTo(w-12,y(v));ctx.stroke();}
+  paths.forEach((points,i)=>{ctx.strokeStyle=strategyColor(variants[i]);ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x(0),y(0));points.slice(1).forEach((v,j)=>{ctx.lineTo(x(j+1),y(points[j]));ctx.lineTo(x(j+1),y(v));});ctx.stroke();});
+  ctx.fillStyle=theme('--muted');ctx.fillText('시작',64,h-8);ctx.textAlign='right';ctx.fillText(times.length?'청산 '+times.length+'개 시점':'청산 거래 없음',w-12,h-8);
+}
+function render(){
+  const key=$('date').value, run=mode==='paper'?data.paper.find(r=>r.name===key):data.replay;
+  const matching=t=>mode==='paper'||!key||t.slice(0,10)===key;
+  const valid=Boolean(run&&(mode==='paper'||run.bars.some(b=>matching(b.start))));
+  $('content').hidden=!valid;$('empty').hidden=valid;
+  if(!valid){const state=data.sessions.find(s=>s.day===key)?.state;$('empty').textContent=mode==='paper'?'저장된 NH 모의계좌 결과가 없습니다.':state==='pending'?'장 종료 전이라 이 날짜의 리플레이를 보류했습니다.':'이 범위에 저장된 리플레이 결과가 없습니다.';return;}
+
+  const variants=mode==='paper'?['C']:['A','B','C'];
+  const trades=run.trades.filter(t=>matching(t.exit_at)).sort((a,b)=>a.exit_at.localeCompare(b.exit_at));
+  const holds=run.holds.filter(t=>matching(t.at));
+  const timestamp=t=>t.slice(5,16).replace('T',' ');
+  function section(title) {
+    const panel=node('section','','panel');
+    panel.append(node('h2',title));
+    return panel;
+  }
+  function rowsTable(panel,headers,rows,empty) {
+    const scroll=node('div','','scroll');
+    const tableElement=node('table','');
+    const head=node('thead','');
+    const headRow=node('tr','');
+    headers.forEach(label=>headRow.append(node('th',label)));
+    head.append(headRow);
+    const body=node('tbody','');
+    for(const values of rows) {
+      const row=node('tr','');
+      values.forEach(value=>row.append(node('td',value)));
+      body.append(row);
+    }
+    if(!rows.length) {
+      const row=node('tr','');
+      const cell=node('td',empty,'data');
+      cell.colSpan=headers.length;
+      row.append(cell);
+      body.append(row);
+    }
+    tableElement.append(head,body);
+    scroll.append(tableElement);
+    panel.append(scroll);
+  }
+  function column(variant) {
+    const ownTrades=trades.filter(t=>t.strategy===variant);
+    const ownHolds=holds.filter(t=>t.strategy===variant);
+    const metrics=stats(ownTrades);
+    const column=node('section','','strategy-column');
+    column.style.setProperty('--strategy',strategyColor(variant));
+    column.setAttribute('aria-label',variant+' '+names[variant]);
+    column.append(node('h2',variant+' · '+names[variant]));
+    const cards=node('div','','grid');
+    for(const [label,value] of [
+      ['누적 순손익',money.format(metrics.net)],
+      ['거래 수 / 승률',metrics.n+' / '+(metrics.n?Math.round(metrics.wins*100/metrics.n)+'%':'—')],
+      ['최대낙폭',money.format(metrics.mdd)]
+    ]) {
+      const card=node('div','','card');
+      card.append(node('div',label,'data'),node('b',value,label==='누적 순손익'?(metrics.net>0?'pos':metrics.net<0?'neg':''):''));
+      cards.append(card);
+    }
+    column.append(cards);
+    const chartPanel=section('누적 실현 손익 · USD');
+    const canvas=node('canvas','');
+    canvas.setAttribute('role','img');
+    canvas.setAttribute('aria-label',variant+' 누적 실현 손익');
+    chartPanel.append(canvas);
+    column.append(chartPanel);
+    const tradesPanel=section('체결 내역 · KST');
+    rowsTable(tradesPanel,['진입','청산','방향','진입가','청산가','사유','순손익'],
+      ownTrades.map(t=>[timestamp(t.entry_at),timestamp(t.exit_at),t.side==='1'?'매수':'매도',
+        Number(t.entry_price).toFixed(4),Number(t.exit_price).toFixed(4),t.reason,money.format(t.net)]),
+      '해당 기간의 청산 거래가 없습니다.');
+    column.append(tradesPanel);
+    const counts=new Map();
+    ownHolds.forEach(h=>counts.set(h.reason,(counts.get(h.reason)||0)+1));
+    const holdPanel=section('진입 보류 사유 · '+ownHolds.length+'건');
+    rowsTable(holdPanel,['사유','건수'],[...counts].sort(),'보류 기록이 없습니다.');
+    column.append(holdPanel);
+    const holdDetails=node('details','');
+    holdDetails.append(node('summary','보류 내역 보기'));
+    rowsTable(holdDetails,['시각 KST','방향','사유'],
+      ownHolds.map(h=>[timestamp(h.at),h.side==='1'?'매수':'매도',h.reason]),
+      '보류 기록이 없습니다.');
+    column.append(holdDetails);
+    const positions=run.positions.filter(p=>p.strategy===variant&&matching(p.entry_at));
+    if(positions.length) column.append(node('p','미청산 포지션 '+positions.length+'건','notice'));
+    return {column,canvas,trades:ownTrades,variant};
+  }
+  const mainColumns=variants.map(column);
+  const extraColumns=mode==='replay'?['C-1','A-unlimited'].map(column):[];
+  $('columns').replaceChildren(...mainColumns.map(item=>item.column));
+  $('extra-columns').replaceChildren(...extraColumns.map(item=>item.column));
+  $('extra').hidden=mode!=='replay';
+  const draw=()=>[...mainColumns,...extraColumns].forEach(item=>chart(item.canvas,item.trades,[item.variant]));
+  draw();
+  $('extra').ontoggle=draw;
+
+}
+function switchMode(next){
+  mode=next;$('subtitle').className='banner'+(mode==='paper'?' paper':'');for(const id of ['replay','paper'])$(id).setAttribute('aria-pressed',String(id===mode));
+  const replay=mode==='replay';$('coverage').hidden=!replay;
+  options($('date'),replay?[['','전체'],...data.sessions.map(s=>[s.day,s.day])]:data.paper.map(r=>[r.name,r.name]));
+  options($('strategy'),[['','모든 전략'],...(replay?strategies:['C']).map(v=>[v,v])]);render();
+}
+const th=data.thresholds;
+$('subtitle').textContent=th.symbol?`${th.symbol} · 5분봉 · KST · 리플레이 편도 ${th.slippage_ticks}틱 / 수수료 ${money.format(th.fee_per_side)}`:'5분봉 · KST';
+$('status').replaceChildren(...data.sessions.map(s=>node('li',s.day+' · '+({ready:'리플레이 완료 · '+s.received+'/'+s.expected+'봉',pending:'장 종료 전 보류',missing:'결과 없음'})[s.state],s.state)));
+if(data.baseline){const b=data.baseline;$('baseline').hidden=false;$('baseline').textContent=`09:00–23:45 KST 기준 · 11/02–13 기준 구간 ${b.received}/${b.expected}봉 · 누락률 ${(100*Number(b.missing_ratio)).toFixed(2)}%`;}
+$('replay').onclick=()=>switchMode('replay');$('paper').onclick=()=>switchMode('paper');$('date').onchange=render;$('strategy').onchange=render;window.addEventListener('resize',render);window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',render);switchMode('replay');
+</script></body></html>
