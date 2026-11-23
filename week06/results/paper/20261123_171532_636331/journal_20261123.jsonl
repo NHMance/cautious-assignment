@@ -1,0 +1,8 @@
+{"ts": "2026-11-23T17:15:32+09:00", "type": "RUN_START", "symbol": "HGH27", "state": "", "environment": "paper", "strategy": "C", "entry_open": "17:00:00", "entry_close": "22:20:00", "force_close": "22:45:00", "run_end": "23:30:00"}
+{"ts": "2026-11-23T17:15:33+09:00", "type": "ACCOUNT_CHECK", "symbol": "HGH27", "state": "", "position_qty": 0, "pending": 0}
+{"ts": "2026-11-23T17:15:35+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "connected"}
+{"ts": "2026-11-23T17:15:35+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "init"}
+{"ts": "2026-11-23T17:15:35+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "subscribe_sent"}
+{"ts": "2026-11-23T17:15:35+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "subscribe_sent"}
+{"ts": "2026-11-23T17:15:36+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "other"}
+{"ts": "2026-11-23T17:15:36+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "other"}
