@@ -9,7 +9,7 @@ from datetime import date, datetime, time, timedelta
 from pathlib import Path
 
 from copper.results import export, write_csv
-from copper.strategy import BASE_FIRST, BASE_LAST, KST, RUN_END, STEP, TEST_FIRST, TEST_LAST, Costs, Thresholds, calibrate
+from copper.strategy import BASE_FIRST, BASE_LAST, KST, RUN_END, TEST_FIRST, TEST_LAST, Costs, Thresholds, calibrate
 
 ROOT = Path(__file__).resolve().parent
 SYMBOL, EXCHANGE = "HGH27", "FCME"
@@ -32,7 +32,9 @@ def parser():
     baseline = sub.add_parser("calibrate")
     baseline.add_argument("--fee-per-side", type=float, default=0)
     baseline.add_argument("--slippage-ticks", type=int, default=1)
-    sub.add_parser("replay")
+    replay_cmd = sub.add_parser("replay")
+    replay_cmd.add_argument("--env-file", type=Path, default=ROOT / ".env")
+    replay_cmd.add_argument("--bar-stamp", choices=("start", "end"), default="start")
     sub.add_parser("bot-test")
     dash = sub.add_parser("dashboard")
     dash.add_argument("--port", type=int, default=8606)
@@ -146,6 +148,7 @@ def main():
         return
 
     from copper.market import api, connect, fetch_bars, load_bars
+    from backend.nh_api.errors import NHApiError
 
     try:
         if args.command == "calibrate":
@@ -157,10 +160,20 @@ def main():
 
             thresholds = load_thresholds(root)
             bars = load_bars(raw)
-            if not any(TEST_FIRST <= bar.start.date() <= TEST_LAST for bar in bars):
-                raise ValueError("11/23–27의 확정봉을 먼저 수집하세요")
+            test_bars = [bar for bar in bars if TEST_FIRST <= bar.start.date() <= TEST_LAST]
+            if not test_bars and datetime.now(KST).date() >= TEST_FIRST:
+                session = connect(args.env_file)
+                try:
+                    test_bars = fetch_bars(SYMBOL, EXCHANGE, TEST_FIRST, TEST_LAST, args.bar_stamp)
+                finally:
+                    session.close()
+                bars.extend(test_bars)
+            if not test_bars:
+                raise ValueError(f"{TEST_FIRST}~{TEST_LAST} KST에 아직 조회할 수 있는 확정 5분봉이 없습니다")
             costs = Costs(thresholds.fee_per_side, thresholds.slippage_ticks, thresholds.tick_value)
             export(root / "replay", *replay(bars, thresholds, costs), thresholds)
+            print(f"검증 확정봉 {len(test_bars):,}개 ({test_bars[0].start:%Y-%m-%d %H:%M}~"
+                  f"{test_bars[-1].end:%Y-%m-%d %H:%M} KST)")
             print(root / "replay")
             return
 
@@ -191,7 +204,7 @@ def main():
                 paper(root, session, args, load_thresholds(root))
         finally:
             session.close()
-    except (ValueError, OSError) as exc:
+    except (ValueError, OSError, NHApiError) as exc:
         cli.exit(2, f"{exc}\n")
 
 

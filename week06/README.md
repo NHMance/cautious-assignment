@@ -64,10 +64,11 @@ R6 시각은 실행 시각보다 늦고 22:45 이하여야 한다. R1은 손절 
 uv run python main.py paper --bar-stamp STAMP
 # 별도 터미널에서 실행하고 브라우저에서 http://127.0.0.1:8606 열기
 uv run python main.py dashboard
-# 검증 기간 봉이 쌓인 뒤 A/B/C 같은 기간 비교 (아래 날짜는 예시)
-uv run python main.py collect --bar-stamp STAMP --last 2026-11-27
+# 현재까지 확보된 검증 기간 확정봉으로 A/B/C 비교
 uv run python main.py replay
 ```
+
+`replay`는 11월 23~27일 검증 기간의 확정 5분봉을 사용한다. 로컬에 검증 봉이 없으면 `.env`의 NH 모의계좌 설정으로 확정된 봉을 조회한다. 조회에는 HGH27에서 확인한 시작 시각 라벨(`--bar-stamp start`)을 기본으로 사용한다. 일부 날짜만 확보된 시점에는 출력에 표시된 봉 범위까지만 비교한다. 저장된 검증 봉을 최신으로 갱신하거나 전체 기간 데이터를 보관하려면 `collect --bar-stamp start --last 2026-11-27`을 실행한 뒤 다시 리플레이한다.
 
 운용 로그는 `results/paper/`에 저장한다. 대시보드에서 모의 운용·NH 기능 검증·로컬 봇 테스트를 선택해 거래일, 순손익, 사유별 보류, 체결, 계좌 확인, REST 오류, 봉 누락률, A/B/C 비교를 확인할 수 있다.
 
