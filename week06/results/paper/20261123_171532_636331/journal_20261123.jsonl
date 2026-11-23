@@ -6,3 +6,4 @@
 {"ts": "2026-11-23T17:15:35+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "subscribe_sent"}
 {"ts": "2026-11-23T17:15:36+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "other"}
 {"ts": "2026-11-23T17:15:36+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "other"}
+{"ts": "2026-11-23T17:20:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-23 17:15:00+09:00", "end": "2026-11-23 17:20:00+09:00", "regime": "TREND"}
