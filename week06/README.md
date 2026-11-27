@@ -187,7 +187,7 @@ NH 모의계좌의 R1–R6 개별 기능 검증은 2절의 명령으로 실행�
 
 로컬 봇 테스트 화면입니다. 저장된 두 실행의 R1–R6 검증과 청산·보류 사유를 보여 줍니다. 화면 상단의 손익과 거래 수는 두 로컬 실행의 합계입니다.
 
-![week06 로컬 봇 테스트 대시보드](screenshots/dashboard_bot_test.jpg)
+[로컬 봇 테스트 대시보드 캡처](screenshots/dashboard_bot_test.jpg)
 
 ## 7. 결과 해석과 한계
 
