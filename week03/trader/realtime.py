@@ -186,7 +186,6 @@ class NHStream:
     idle_timeout: float | None = IDLE_TIMEOUT_SEC
     connect: Callable[..., Any] = ws_connect
     max_attempts: int | None = None                     # None 이면 멈출 때까지 다시 접속
-    ping_interval: float | None = None
     connections: int = dc_field(default=0, init=False)
 
     def __post_init__(self) -> None:
@@ -228,7 +227,8 @@ class NHStream:
         if stop.is_set():
             return
         url = f"{self.ws_url.rstrip('/')}{STREAM_PATH}?access_key={access_key}"
-        async with self.connect(url, ping_interval=self.ping_interval, max_size=2**22) as ws:
+        # NH uses an application-level pingpong message.
+        async with self.connect(url, ping_interval=None, max_size=2**22) as ws:
             if stop.is_set():
                 return
             self.connections += 1
