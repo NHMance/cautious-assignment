@@ -13,7 +13,7 @@ import trader  # Registers the Week 02 backend.
 from backend.config import DEFAULT_BASE_URLS, Config, EnvironmentConfig, MarketConfig
 from backend.nh_api import runtime
 from backend.nh_api.errors import GatewayError
-from backend.nh_api.session import create_session
+from backend.nh_api.session import DEFAULT_TIMEOUT, create_session
 from backend.overseas_futureoption import overseas_futureoption_functions as api
 from backend.overseas_futureoption.overseas_history import at_end
 from bot.credentials import load_env_file
@@ -21,7 +21,7 @@ from bot.market import number
 from trader.market import DATE_FIELDS, TIME_FIELDS, _first
 
 
-def connect(env_file):
+def connect(env_file, *, timeout=DEFAULT_TIMEOUT):
     import os
 
     load_env_file(env_file)
@@ -33,7 +33,7 @@ def connect(env_file):
     config = EnvironmentConfig(environment, DEFAULT_BASE_URLS[environment],
                                MarketConfig(environment, "domestic", "", ""),
                                MarketConfig(environment, "overseas", key, secret))
-    session = create_session(config=Config(environment, {environment: config}))
+    session = create_session(config=Config(environment, {environment: config}), timeout=timeout)
     runtime.use(session)
     return session
 

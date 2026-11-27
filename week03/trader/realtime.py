@@ -19,7 +19,7 @@
 (`scripts/ws_check.py` 가 원문을 남깁니다). 그래서 `field()` 는 body 를 먼저 보고 없으면 바깥을 봅니다.
 
 끊기면 1·2·5·10·30초 간격으로 다시 접속하고 구독을 다시 겁니다. 일정 시간(기본 60초) 아무 메시지가
-없으면 끊긴 것으로 보고 다시 접속합니다 — 서버의 pingpong 이 그보다 자주 옵니다.
+없으면 끊긴 것으로 보고 다시 접속합니다. idle_timeout=None 으로 무수신 제한을 끌 수 있습니다.
 
 봇 루프는 동기 코드라 `RealtimeFeed` 가 별도 스레드에서 이벤트 루프를 돌리고 마지막 체결만 들고 있습니다.
 """
@@ -183,9 +183,10 @@ class NHStream:
     on_data: Callable[[dict[str, Any]], None]
     on_status: Callable[[str, dict[str, Any]], None] = lambda _kind, _detail: None
     reconnect_delays: tuple[float, ...] = RECONNECT_DELAYS
-    idle_timeout: float = IDLE_TIMEOUT_SEC
+    idle_timeout: float | None = IDLE_TIMEOUT_SEC
     connect: Callable[..., Any] = ws_connect
     max_attempts: int | None = None                     # None 이면 멈출 때까지 다시 접속
+    ping_interval: float | None = None
     connections: int = dc_field(default=0, init=False)
 
     def __post_init__(self) -> None:
@@ -201,22 +202,22 @@ class NHStream:
                 await self._session(stop)
                 failures = 0
             except (OSError, ConnectionClosed, StreamError, asyncio.TimeoutError) as exc:
-                self.on_status("disconnected", {"error": f"{type(exc).__name__}: {exc}", "attempt": attempts})
+                self.on_status("disconnected", {"error": type(exc).__name__, "attempt": attempts})
                 failures += 1
             except AuthError as exc:
                 # 키·시크릿이 틀려 거부된 것(EAU0xx)은 다시 해도 같습니다. 네트워크 실패만 다시 시도합니다.
-                self.on_status("error", {"error": f"{type(exc).__name__}: {exc}", "attempt": attempts})
+                self.on_status("error", {"error": type(exc).__name__, "attempt": attempts})
                 if "거부" in str(exc):
-                    self.on_status("fatal", {"error": "인증이 거부되어 다시 접속하지 않습니다"})
+                    self.on_status("fatal", {"error": type(exc).__name__, "attempt": attempts})
                     return
                 failures += 1
             except Exception as exc:  # noqa: BLE001 — 기록하고 다시 시도합니다.
-                self.on_status("error", {"error": f"{type(exc).__name__}: {exc}", "attempt": attempts})
+                self.on_status("error", {"error": type(exc).__name__, "attempt": attempts})
                 failures += 1
             if stop.is_set() or (self.max_attempts is not None and attempts >= self.max_attempts):
                 return
             delay = self.reconnect_delays[min(max(failures - 1, 0), len(self.reconnect_delays) - 1)]
-            self.on_status("reconnect_wait", {"seconds": delay})
+            self.on_status("reconnect_wait", {"seconds": delay, "attempt": attempts})
             try:
                 await asyncio.wait_for(stop.wait(), timeout=delay)
             except asyncio.TimeoutError:
@@ -224,34 +225,45 @@ class NHStream:
 
     async def _session(self, stop: asyncio.Event) -> None:
         access_key, access_token = await asyncio.to_thread(self.credentials)
+        if stop.is_set():
+            return
         url = f"{self.ws_url.rstrip('/')}{STREAM_PATH}?access_key={access_key}"
-        # 서버가 앱 수준 pingpong 을 쓰므로 웹소켓 프로토콜 ping 은 끕니다.
-        async with self.connect(url, ping_interval=None, max_size=2**22) as ws:
+        async with self.connect(url, ping_interval=self.ping_interval, max_size=2**22) as ws:
+            if stop.is_set():
+                return
             self.connections += 1
             self.on_status("connected", {"connection": self.connections})
             await ws.send(json.dumps(init_message(access_token)))
             await self._wait_init(ws)
-            for sub in self.subscriptions:
-                await ws.send(json.dumps(sub.message()))
-                self.on_status("subscribe_sent", {"action_code": sub.action_code, "action_sym": sub.action_sym})
-
-            stopper = asyncio.ensure_future(stop.wait())
+            stopper = asyncio.create_task(stop.wait())
+            subscribed = []
             try:
+                for sub in self.subscriptions:
+                    if stop.is_set():
+                        break
+                    await ws.send(json.dumps(sub.message()))
+                    subscribed.append(sub)
+                    self.on_status("subscribe_sent", {"action_code": sub.action_code, "action_sym": sub.action_sym})
+
                 while not stop.is_set():
                     recv = asyncio.ensure_future(ws.recv())
-                    done, _ = await asyncio.wait({recv, stopper}, timeout=self.idle_timeout,
-                                                 return_when=asyncio.FIRST_COMPLETED)
-                    if stopper in done:
-                        recv.cancel()
-                        break
-                    if recv not in done:
-                        recv.cancel()
-                        raise asyncio.TimeoutError(f"{self.idle_timeout:g}초 동안 메시지가 없습니다")
-                    await self._handle(ws, recv.result())
-                # 수신 처리 중에 멈춤 신호가 와도 여기로 옵니다. 정상 종료면 구독을 풀고 나갑니다.
-                await self._unsubscribe(ws)
+                    try:
+                        done, _ = await asyncio.wait({recv, stopper}, timeout=self.idle_timeout,
+                                                     return_when=asyncio.FIRST_COMPLETED)
+                        if stopper in done:
+                            break
+                        if recv not in done:
+                            raise asyncio.TimeoutError(f"{self.idle_timeout:g}초 동안 메시지가 없습니다")
+                        await self._handle(ws, recv.result())
+                    finally:
+                        if not recv.done():
+                            recv.cancel()
+                        await asyncio.gather(recv, return_exceptions=True)
             finally:
                 stopper.cancel()
+                await asyncio.gather(stopper, return_exceptions=True)
+                if stop.is_set():
+                    await self._unsubscribe(ws, subscribed)
 
     async def _wait_init(self, ws: Any) -> None:
         deadline = asyncio.get_running_loop().time() + INIT_TIMEOUT_SEC
@@ -268,7 +280,7 @@ class NHStream:
             if kind == "pingpong":
                 await ws.send("")
                 continue
-            raise StreamError(f"세션 초기화 실패: {raw!r}")
+            raise StreamError("세션 초기화 실패")
 
     async def _handle(self, ws: Any, raw: Any) -> None:
         msg = _loads(raw)
@@ -283,8 +295,8 @@ class NHStream:
         else:
             self.on_status(kind, msg)
 
-    async def _unsubscribe(self, ws: Any) -> None:
-        for sub in self.subscriptions:
+    async def _unsubscribe(self, ws: Any, subscriptions: list[Subscription]) -> None:
+        for sub in subscriptions:
             try:
                 await ws.send(json.dumps(sub.message(UNSUBSCRIBE)))
             except ConnectionClosed:
