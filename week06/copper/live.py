@@ -65,7 +65,7 @@ class Feed:
         self.journal = journal
         self.stream = NHStream(DEFAULT_WS_URLS["paper"], session_credentials(session, environment="paper"),
                                [Subscription(kind, code) for code in symbols for kind in (FA, FB)],
-                               self.data, self.status, idle_timeout=None, ping_interval=20)
+                               self.data, self.status, idle_timeout=None)
 
     def status(self, event, detail):
         if event in ("connected", "disconnected", "fatal", "error"):

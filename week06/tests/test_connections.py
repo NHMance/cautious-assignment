@@ -49,7 +49,13 @@ def test_paper_stream_reconnects_and_unsubscribes_without_logging_secrets(tmp_pa
     async def scenario():
         feed = Feed({"SYMBOL": "HGH27"}, Mock(), Mock(), journal)
         assert feed.stream.idle_timeout is None
-        assert feed.stream.ping_interval is not None
+        connect = feed.stream.connect
+
+        def nh_connect(url, **options):
+            assert options["ping_interval"] is None
+            return connect(url, **options)
+
+        feed.stream.connect = nh_connect
         feed.stream.reconnect_delays = (0.01,)
         feed.stream.credentials = Mock(side_effect=[
             OSError("secret-access-key"), ("first-key", "test-token"), ("second-key", "test-token"),
@@ -66,6 +72,8 @@ def test_paper_stream_reconnects_and_unsubscribes_without_logging_secrets(tmp_pa
             await ws.send(json.dumps({"code": "INIT", "msg": "INIT_SUCCESS"}))
             for _ in range(2):
                 subscriptions.append(json.loads(await ws.recv()))
+            await ws.send(json.dumps({"code": "pingpong"}))
+            assert await ws.recv() == ""
             if len(keys) == 1:
                 if abrupt:
                     ws.transport.abort()
