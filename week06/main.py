@@ -6,6 +6,7 @@ import json
 from collections import Counter
 from dataclasses import asdict, replace
 from datetime import date, datetime, time, timedelta
+from math import isfinite
 from pathlib import Path
 
 from copper.results import export, write_csv
@@ -13,7 +14,15 @@ from copper.strategy import BASE_FIRST, BASE_LAST, KST, RUN_END, TEST_FIRST, TES
 
 ROOT = Path(__file__).resolve().parent
 SYMBOL, EXCHANGE = "HGH27", "FCME"
+PAPER_REST_TIMEOUT = 20.0
 FIELDS = ("start", "open", "high", "low", "close", "volume")
+
+
+def positive_seconds(value):
+    seconds = float(value)
+    if not isfinite(seconds) or seconds <= 0:
+        raise argparse.ArgumentTypeError("타임아웃은 0보다 큰 유한한 초 단위 값이어야 합니다")
+    return seconds
 
 
 def parser():
@@ -29,6 +38,8 @@ def parser():
     sub.choices["collect"].add_argument("--last", type=date.fromisoformat, default=BASE_LAST)
     sub.choices["paper"].add_argument("--function-test", choices=[f"R{n}" for n in range(1, 7)])
     sub.choices["paper"].add_argument("--force-at", type=time.fromisoformat)
+    sub.choices["paper"].add_argument("--rest-timeout", type=positive_seconds, default=PAPER_REST_TIMEOUT,
+                                     help="REST 타임아웃(초), 기본값 %(default)s")
     baseline = sub.add_parser("calibrate")
     baseline.add_argument("--fee-per-side", type=float, default=0)
     baseline.add_argument("--slippage-ticks", type=int, default=1)
@@ -148,7 +159,7 @@ def main():
         return
 
     from copper.market import api, connect, fetch_bars, load_bars
-    from backend.nh_api.errors import NHApiError
+    from backend.nh_api.errors import NHApiError, TransportError
 
     try:
         if args.command == "calibrate":
@@ -177,7 +188,8 @@ def main():
             print(root / "replay")
             return
 
-        session = connect(args.env_file)
+        session = (connect(args.env_file, timeout=args.rest_timeout) if args.command == "paper"
+                   else connect(args.env_file))
         try:
             if args.command == "collect":
                 if not BASE_LAST <= args.last <= TEST_LAST:
@@ -205,6 +217,10 @@ def main():
         finally:
             session.close()
     except (ValueError, OSError, NHApiError) as exc:
+        if args.command == "paper" and isinstance(exc, TransportError):
+            from copper.live import connection_error_type
+
+            cli.exit(2, f"{exc.api_id} {connection_error_type(exc)} (시도 1회)\n")
         cli.exit(2, f"{exc}\n")
 
 

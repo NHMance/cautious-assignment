@@ -7,8 +7,11 @@ from dataclasses import dataclass, replace
 from datetime import datetime, time, timedelta
 from math import isfinite
 
+import httpx
+
 from .market import api, fetch_bars, quote_symbol
-from backend.nh_api.errors import BusinessError
+from backend.auth.auth_functions import AuthError
+from backend.nh_api.errors import BusinessError, TransportError
 from .replay import Portfolio
 from .results import export, export_spreads
 from .strategy import BASE_FIRST, ENTRY_OPEN, ENTRY_CLOSE, FORCE_CLOSE, RUN_END, KST, STEP, TICK
@@ -62,13 +65,16 @@ class Feed:
         self.journal = journal
         self.stream = NHStream(DEFAULT_WS_URLS["paper"], session_credentials(session, environment="paper"),
                                [Subscription(kind, code) for code in symbols for kind in (FA, FB)],
-                               self.data, self.status)
+                               self.data, self.status, idle_timeout=None, ping_interval=20)
 
     def status(self, event, detail):
         if event in ("connected", "disconnected", "fatal", "error"):
             self.quotes.clear()
             self.ticks.clear()
-        self.journal.write("WS_STATUS", event=event)
+        fields = {}
+        if event in ("disconnected", "fatal", "error", "reconnect_wait"):
+            fields = {key: detail[key] for key in ("error", "attempt", "seconds") if key in detail}
+        self.journal.write("WS_STATUS", event=event, **fields)
 
     def data(self, msg):
         now = datetime.now(KST)
@@ -147,6 +153,19 @@ class OrderRejected(RuntimeError):
     pass
 
 
+REST_CONNECTION_ERRORS = (TransportError, httpx.TransportError, OSError)
+
+
+def connection_error_type(exc):
+    while exc.__cause__ and isinstance(exc.__cause__, (*REST_CONNECTION_ERRORS, AuthError)):
+        exc = exc.__cause__
+    return type(exc).__name__
+
+
+def lock_message(exc):
+    return connection_error_type(exc) if isinstance(exc, REST_CONNECTION_ERRORS) else str(exc)
+
+
 class RestJournal(Journal):
     def write(self, type_, **fields):
         record = super().write(type_, **fields)
@@ -156,8 +175,10 @@ class RestJournal(Journal):
         return record
 
     def error(self, api_name, exc, **fields):
-        fields.setdefault("response", getattr(exc, "body", None))
         fields.setdefault("action", "조회 실패 기록. 주문 결과 확인이 불가능하면 주문 잠금")
+        if isinstance(exc, REST_CONNECTION_ERRORS):
+            return self.write("ERROR", api=api_name, kind=connection_error_type(exc), attempt=1, **fields)
+        fields.setdefault("response", getattr(exc, "body", None))
         return super().error(api_name, exc, **fields)
 
 
@@ -224,9 +245,9 @@ class PaperExecution:
         except Exception as exc:
             self.uncertain = True
             self.journal.error(stage, exc, role=role, reason=reason, action="자동 주문 잠금. NH 주문·체결·잔고 수동 대사")
-            self.journal.write("LOCK_UNKNOWN", api=stage, role=role, reason=reason, message=str(exc),
+            self.journal.write("LOCK_UNKNOWN", api=stage, role=role, reason=reason, message=lock_message(exc),
                                action="자동 주문 잠금. NH 주문·체결·잔고 수동 대사")
-            raise TradingLocked(str(exc)) from exc
+            raise TradingLocked(lock_message(exc)) from None
 
     def reject(self, role, code, message, response):
         self.journal.write("ORDER_REJECT", api="overseas_order", role=role, code=code, message=message,
@@ -253,7 +274,7 @@ async def run_live(root, session, thresholds, exchange, stamp, *, previous=(), r
         await asyncio.to_thread(execution.assert_position, 0)
     except Exception as exc:
         journal.error("overseas_open-interest / overseas_order-history", exc, action="운영 시작 중단. 잔고 및 미체결 대사")
-        journal.write("LOCK_UNKNOWN", message=str(exc), action="NH 주문·체결·잔고 수동 대사")
+        journal.write("LOCK_UNKNOWN", message=lock_message(exc), action="NH 주문·체결·잔고 수동 대사")
         raise
     try:
         code = await asyncio.to_thread(quote_symbol, symbol, exchange)
@@ -422,5 +443,5 @@ async def run_live(root, session, thresholds, exchange, stamp, *, previous=(), r
         except Exception as exc:
             journal.error("overseas_open-interest / overseas_order-history", exc,
                           action="종료 대사 실패. NH 주문·체결·잔고 수동 대사")
-            journal.write("LOCK_UNKNOWN", message=str(exc), action="NH 주문·체결·잔고 수동 대사")
+            journal.write("LOCK_UNKNOWN", message=lock_message(exc), action="NH 주문·체결·잔고 수동 대사")
             raise
