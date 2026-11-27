@@ -1,0 +1,14 @@
+{"ts": "2026-11-23T17:00:00+09:00", "type": "RUN_START", "symbol": "HGH27", "state": "", "environment": "bot-test", "scenario": "R3"}
+{"ts": "2026-11-23T17:00:00+09:00", "type": "ACCOUNT_CHECK", "symbol": "HGH27", "state": "", "position_qty": 0, "pending": 0}
+{"ts": "2026-11-23T17:00:00+09:00", "type": "ORDER_REQUEST", "symbol": "HGH27", "state": "", "role": "ENTRY", "side": 1, "reason": null, "qty": 1}
+{"ts": "2026-11-23T17:00:00+09:00", "type": "ORDER_SUBMIT", "symbol": "HGH27", "state": "", "role": "ENTRY", "order_no": "1", "response": {"ord_no": "1"}}
+{"ts": "2026-11-23T17:00:00+09:00", "type": "ACCOUNT_CHECK", "symbol": "HGH27", "state": "", "position_qty": 1, "pending": 0}
+{"ts": "2026-11-23T17:00:00+09:00", "type": "ENTRY", "symbol": "HGH27", "state": "", "price": 5.0, "side": 1}
+{"ts": "2026-11-23T17:00:00+09:00", "type": "ACCOUNT_CHECK", "symbol": "HGH27", "state": "", "position_qty": 1, "pending": 0}
+{"ts": "2026-11-23T17:00:00+09:00", "type": "ORDER_REQUEST", "symbol": "HGH27", "state": "", "role": "EXIT", "side": -1, "reason": "EXIT_STOP", "qty": 1}
+{"ts": "2026-11-23T17:00:00+09:00", "type": "ORDER_SUBMIT", "symbol": "HGH27", "state": "", "role": "EXIT", "order_no": "2", "response": {"ord_no": "2"}}
+{"ts": "2026-11-23T17:00:00+09:00", "type": "ACCOUNT_CHECK", "symbol": "HGH27", "state": "", "position_qty": 0, "pending": 0}
+{"ts": "2026-11-23T17:00:00+09:00", "type": "TRADE", "symbol": "HGH27", "state": "", "strategy": "C", "regime": "TREND", "rule": "TREND", "side": 1, "signal_at": "2026-11-23 17:00:00+09:00", "entry_at": "2026-11-23 17:00:00+09:00", "entry_price": 5.0, "exit_at": "2026-11-23 17:00:00+09:00", "exit_price": 4.996, "reason": "EXIT_STOP", "gross": -100.0, "fees": 0, "slippage": null, "net": -100.0, "budget_exceeded": false}
+{"ts": "2026-11-23T17:00:00+09:00", "type": "HOLD", "symbol": "HGH27", "state": "", "reason": "HOLD_DAILY_LOSS", "regime": "TREND"}
+{"ts": "2026-11-23T17:00:00+09:00", "type": "ACCOUNT_CHECK", "symbol": "HGH27", "state": "", "position_qty": 0, "pending": 0}
+{"ts": "2026-11-23T17:00:00+09:00", "type": "BOT_TEST_PASS", "symbol": "HGH27", "state": "", "rule": "R3", "reason": "HOLD_DAILY_LOSS", "orders": 2, "position_qty": 0, "pending": 0}

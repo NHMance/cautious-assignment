@@ -1,0 +1,1 @@
+{"ts": "2026-11-24T18:47:53+09:00", "type": "ERROR", "symbol": "HGH27", "state": "", "api": "overseas_chart-minute", "kind": "TransportError", "code": null, "message": "해외_차트(분) 요청에 실패했습니다: [Errno 8] nodename nor servname provided, or not known", "action": "확정봉 수신 대기. 다음 조회에서 재확인", "response": null}

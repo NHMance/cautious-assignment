@@ -1,0 +1,173 @@
+{"ts": "2026-11-24T17:23:13+09:00", "type": "RUN_START", "symbol": "HGH27", "state": "", "environment": "paper", "strategy": "C", "entry_open": "17:00:00", "entry_close": "22:20:00", "force_close": "22:45:00", "run_end": "23:30:00"}
+{"ts": "2026-11-24T17:23:14+09:00", "type": "ACCOUNT_CHECK", "symbol": "HGH27", "state": "", "position_qty": 0, "pending": 0}
+{"ts": "2026-11-24T17:23:16+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "connected"}
+{"ts": "2026-11-24T17:23:16+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "init"}
+{"ts": "2026-11-24T17:23:16+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "subscribe_sent"}
+{"ts": "2026-11-24T17:23:16+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "subscribe_sent"}
+{"ts": "2026-11-24T17:23:16+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "other"}
+{"ts": "2026-11-24T17:23:16+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "other"}
+{"ts": "2026-11-24T17:25:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 17:20:00+09:00", "end": "2026-11-24 17:25:00+09:00", "regime": "RANGE"}
+{"ts": "2026-11-24T17:30:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 17:25:00+09:00", "end": "2026-11-24 17:30:00+09:00", "regime": "NEUTRAL"}
+{"ts": "2026-11-24T17:35:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 17:30:00+09:00", "end": "2026-11-24 17:35:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T17:40:00+09:00", "type": "BAR_RECONCILE", "symbol": "HGH27", "state": "", "timestamps": ["2026-11-24T17:30:00+09:00"]}
+{"ts": "2026-11-24T17:40:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 17:35:00+09:00", "end": "2026-11-24 17:40:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T17:45:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 17:40:00+09:00", "end": "2026-11-24 17:45:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T17:50:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 17:45:00+09:00", "end": "2026-11-24 17:50:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T17:55:03+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 17:50:00+09:00", "end": "2026-11-24 17:55:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T18:00:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 17:55:00+09:00", "end": "2026-11-24 18:00:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T18:05:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 18:00:00+09:00", "end": "2026-11-24 18:05:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T18:05:00+09:00", "type": "HOLD", "symbol": "HGH27", "state": "", "regime": "HIGH_VOL", "at": "2026-11-24 18:05:00+09:00", "strategy": "C", "side": -1, "reason": "HOLD_HIGH_VOL"}
+{"ts": "2026-11-24T18:10:00+09:00", "type": "BAR_RECONCILE", "symbol": "HGH27", "state": "", "timestamps": ["2026-11-24T18:00:00+09:00"]}
+{"ts": "2026-11-24T18:10:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 18:05:00+09:00", "end": "2026-11-24 18:10:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T18:15:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 18:10:00+09:00", "end": "2026-11-24 18:15:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T18:47:53+09:00", "type": "ERROR", "symbol": "HGH27", "state": "", "api": "overseas_chart-minute", "kind": "TransportError", "code": null, "message": "해외_차트(분) 요청에 실패했습니다: [Errno 8] nodename nor servname provided, or not known", "action": "확정봉 수신 대기. 다음 조회에서 재확인", "response": null}
+{"ts": "2026-11-24T18:47:58+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 18:15:00+09:00", "end": "2026-11-24 18:20:00+09:00", "regime": "TREND"}
+{"ts": "2026-11-24T18:47:58+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 18:20:00+09:00", "end": "2026-11-24 18:25:00+09:00", "regime": "TREND"}
+{"ts": "2026-11-24T18:47:58+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 18:25:00+09:00", "end": "2026-11-24 18:30:00+09:00", "regime": "TREND"}
+{"ts": "2026-11-24T18:47:58+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 18:30:00+09:00", "end": "2026-11-24 18:35:00+09:00", "regime": "TREND"}
+{"ts": "2026-11-24T18:47:58+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 18:35:00+09:00", "end": "2026-11-24 18:40:00+09:00", "regime": "TREND"}
+{"ts": "2026-11-24T18:47:58+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 18:40:00+09:00", "end": "2026-11-24 18:45:00+09:00", "regime": "TREND"}
+{"ts": "2026-11-24T18:48:59+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "disconnected"}
+{"ts": "2026-11-24T18:48:59+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "reconnect_wait"}
+{"ts": "2026-11-24T18:49:00+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "connected"}
+{"ts": "2026-11-24T18:49:00+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "init"}
+{"ts": "2026-11-24T18:49:00+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "subscribe_sent"}
+{"ts": "2026-11-24T18:49:01+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "subscribe_sent"}
+{"ts": "2026-11-24T18:49:01+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "other"}
+{"ts": "2026-11-24T18:49:01+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "other"}
+{"ts": "2026-11-24T18:50:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 18:45:00+09:00", "end": "2026-11-24 18:50:00+09:00", "regime": "TREND"}
+{"ts": "2026-11-24T18:55:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 18:50:00+09:00", "end": "2026-11-24 18:55:00+09:00", "regime": "TREND"}
+{"ts": "2026-11-24T19:00:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 18:55:00+09:00", "end": "2026-11-24 19:00:00+09:00", "regime": "TREND"}
+{"ts": "2026-11-24T19:05:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 19:00:00+09:00", "end": "2026-11-24 19:05:00+09:00", "regime": "TREND"}
+{"ts": "2026-11-24T19:10:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 19:05:00+09:00", "end": "2026-11-24 19:10:00+09:00", "regime": "TREND"}
+{"ts": "2026-11-24T19:15:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 19:10:00+09:00", "end": "2026-11-24 19:15:00+09:00", "regime": "NEUTRAL"}
+{"ts": "2026-11-24T19:20:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 19:15:00+09:00", "end": "2026-11-24 19:20:00+09:00", "regime": "TREND"}
+{"ts": "2026-11-24T19:20:00+09:00", "type": "ACCOUNT_CHECK", "symbol": "HGH27", "state": "", "position_qty": 0, "pending": 0}
+{"ts": "2026-11-24T19:20:00+09:00", "type": "ORDER_REQUEST", "symbol": "HGH27", "state": "", "role": "ENTRY", "side": -1, "reason": null, "qty": 1}
+{"ts": "2026-11-24T19:20:00+09:00", "type": "ORDER_SUBMIT", "symbol": "HGH27", "state": "", "role": "ENTRY", "order_no": "443", "response": {"ord_no": "0000000443", "trd_div_cd": "2", "ord_qty": "00000000000001.000000000", "org_ord_no": "0000000000", "sym": "HGH27", "ord_pric": "00000000000000.000000000", "err_msg": "주문이 정상처리 되었습니다.", "biz_dt": "20261124", "mo_ord_no": "0000000443", "qt_div_cd": "1", "err_cd": "00000"}}
+{"ts": "2026-11-24T19:20:01+09:00", "type": "FILL", "symbol": "HGH27", "state": "", "role": "ENTRY", "order_no": "443", "side": "SHORT", "price": 5.5305, "qty": 1, "fill_source": "actual", "status": "6"}
+{"ts": "2026-11-24T19:20:02+09:00", "type": "ACCOUNT_CHECK", "symbol": "HGH27", "state": "", "position_qty": 1, "pending": 0}
+{"ts": "2026-11-24T19:20:02+09:00", "type": "ENTRY", "symbol": "HGH27", "state": "", "strategy": "C", "signal_at": "2026-11-24 19:20:00+09:00", "at": "2026-11-24 19:20:00+09:00", "side": -1, "price": 5.5305, "rule": "TREND", "regime": "TREND", "stop": 5.5455}
+{"ts": "2026-11-24T19:28:13+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 19:20:00+09:00", "end": "2026-11-24 19:25:00+09:00", "regime": "TREND"}
+{"ts": "2026-11-24T19:28:31+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "disconnected"}
+{"ts": "2026-11-24T19:28:31+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "reconnect_wait"}
+{"ts": "2026-11-24T19:28:34+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "connected"}
+{"ts": "2026-11-24T19:28:34+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "init"}
+{"ts": "2026-11-24T19:28:34+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "subscribe_sent"}
+{"ts": "2026-11-24T19:28:34+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "subscribe_sent"}
+{"ts": "2026-11-24T19:28:34+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "other"}
+{"ts": "2026-11-24T19:28:34+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "other"}
+{"ts": "2026-11-24T19:30:46+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 19:25:00+09:00", "end": "2026-11-24 19:30:00+09:00", "regime": "NEUTRAL"}
+{"ts": "2026-11-24T19:50:23+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 19:30:00+09:00", "end": "2026-11-24 19:35:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T19:50:23+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 19:35:00+09:00", "end": "2026-11-24 19:40:00+09:00", "regime": "TREND"}
+{"ts": "2026-11-24T19:50:23+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 19:40:00+09:00", "end": "2026-11-24 19:45:00+09:00", "regime": "TREND"}
+{"ts": "2026-11-24T19:50:23+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 19:45:00+09:00", "end": "2026-11-24 19:50:00+09:00", "regime": "TREND"}
+{"ts": "2026-11-24T19:50:41+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "disconnected"}
+{"ts": "2026-11-24T19:50:41+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "reconnect_wait"}
+{"ts": "2026-11-24T19:50:46+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "connected"}
+{"ts": "2026-11-24T19:50:46+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "init"}
+{"ts": "2026-11-24T19:50:46+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "subscribe_sent"}
+{"ts": "2026-11-24T19:50:46+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "subscribe_sent"}
+{"ts": "2026-11-24T19:50:46+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "other"}
+{"ts": "2026-11-24T19:50:46+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "other"}
+{"ts": "2026-11-24T19:55:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 19:50:00+09:00", "end": "2026-11-24 19:55:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T20:00:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 19:55:00+09:00", "end": "2026-11-24 20:00:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T20:05:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 20:00:00+09:00", "end": "2026-11-24 20:05:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T20:10:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 20:05:00+09:00", "end": "2026-11-24 20:10:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T20:15:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 20:10:00+09:00", "end": "2026-11-24 20:15:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T20:20:01+09:00", "type": "ACCOUNT_CHECK", "symbol": "HGH27", "state": "", "position_qty": 1, "pending": 0}
+{"ts": "2026-11-24T20:20:01+09:00", "type": "ORDER_REQUEST", "symbol": "HGH27", "state": "", "role": "EXIT", "side": 1, "reason": "EXIT_TIME", "qty": 1}
+{"ts": "2026-11-24T20:20:01+09:00", "type": "ORDER_SUBMIT", "symbol": "HGH27", "state": "", "role": "EXIT", "order_no": "458", "response": {"ord_no": "0000000458", "trd_div_cd": "1", "ord_qty": "00000000000001.000000000", "org_ord_no": "0000000000", "sym": "HGH27", "ord_pric": "00000000000000.000000000", "err_msg": "주문이 정상처리 되었습니다.", "biz_dt": "20261124", "mo_ord_no": "0000000458", "qt_div_cd": "1", "err_cd": "00000"}}
+{"ts": "2026-11-24T20:20:02+09:00", "type": "FILL", "symbol": "HGH27", "state": "", "role": "EXIT", "order_no": "458", "side": "LONG", "price": 5.492, "qty": 1, "fill_source": "actual", "status": "6"}
+{"ts": "2026-11-24T20:20:02+09:00", "type": "ACCOUNT_CHECK", "symbol": "HGH27", "state": "", "position_qty": 0, "pending": 0}
+{"ts": "2026-11-24T20:20:02+09:00", "type": "TRADE", "symbol": "HGH27", "state": "", "strategy": "C", "regime": "TREND", "rule": "TREND", "side": -1, "signal_at": "2026-11-24 19:20:00+09:00", "entry_at": "2026-11-24 19:20:00+09:00", "entry_price": 5.5305, "exit_at": "2026-11-24 20:20:01+09:00", "exit_price": 5.492, "reason": "EXIT_TIME", "gross": 962.5, "fees": 0, "slippage": -12.5, "net": 962.5, "budget_exceeded": false}
+{"ts": "2026-11-24T20:20:02+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 20:15:00+09:00", "end": "2026-11-24 20:20:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T20:25:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 20:20:00+09:00", "end": "2026-11-24 20:25:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T20:30:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 20:25:00+09:00", "end": "2026-11-24 20:30:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T20:35:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 20:30:00+09:00", "end": "2026-11-24 20:35:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T20:40:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 20:35:00+09:00", "end": "2026-11-24 20:40:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T20:45:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 20:40:00+09:00", "end": "2026-11-24 20:45:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T20:50:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 20:45:00+09:00", "end": "2026-11-24 20:50:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T21:06:53+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 20:50:00+09:00", "end": "2026-11-24 20:55:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T21:06:53+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 20:55:00+09:00", "end": "2026-11-24 21:00:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T21:06:53+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 21:00:00+09:00", "end": "2026-11-24 21:05:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T21:08:01+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "disconnected"}
+{"ts": "2026-11-24T21:08:01+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "reconnect_wait"}
+{"ts": "2026-11-24T21:08:11+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "connected"}
+{"ts": "2026-11-24T21:08:11+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "init"}
+{"ts": "2026-11-24T21:08:11+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "subscribe_sent"}
+{"ts": "2026-11-24T21:08:11+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "subscribe_sent"}
+{"ts": "2026-11-24T21:08:11+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "other"}
+{"ts": "2026-11-24T21:08:11+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "other"}
+{"ts": "2026-11-24T21:10:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 21:05:00+09:00", "end": "2026-11-24 21:10:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T21:15:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 21:10:00+09:00", "end": "2026-11-24 21:15:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T21:20:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 21:15:00+09:00", "end": "2026-11-24 21:20:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T21:25:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 21:20:00+09:00", "end": "2026-11-24 21:25:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T21:30:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 21:25:00+09:00", "end": "2026-11-24 21:30:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T21:30:00+09:00", "type": "HOLD", "symbol": "HGH27", "state": "", "regime": "HIGH_VOL", "at": "2026-11-24 21:30:00+09:00", "strategy": "C", "side": -1, "reason": "HOLD_HIGH_VOL"}
+{"ts": "2026-11-24T21:35:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 21:30:00+09:00", "end": "2026-11-24 21:35:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T21:52:24+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 21:35:00+09:00", "end": "2026-11-24 21:40:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T21:52:24+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 21:40:00+09:00", "end": "2026-11-24 21:45:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T21:52:24+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 21:45:00+09:00", "end": "2026-11-24 21:50:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T21:53:32+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "disconnected"}
+{"ts": "2026-11-24T21:53:32+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "reconnect_wait"}
+{"ts": "2026-11-24T21:54:02+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "connected"}
+{"ts": "2026-11-24T21:54:02+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "init"}
+{"ts": "2026-11-24T21:54:02+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "subscribe_sent"}
+{"ts": "2026-11-24T21:54:02+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "subscribe_sent"}
+{"ts": "2026-11-24T21:54:02+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "other"}
+{"ts": "2026-11-24T21:54:02+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "other"}
+{"ts": "2026-11-24T22:07:54+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 21:50:00+09:00", "end": "2026-11-24 21:55:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T22:07:54+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 21:55:00+09:00", "end": "2026-11-24 22:00:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T22:07:54+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 22:00:00+09:00", "end": "2026-11-24 22:05:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T22:09:01+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "disconnected"}
+{"ts": "2026-11-24T22:09:01+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "reconnect_wait"}
+{"ts": "2026-11-24T22:25:39+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 22:05:00+09:00", "end": "2026-11-24 22:10:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T22:25:39+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 22:10:00+09:00", "end": "2026-11-24 22:15:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T22:25:39+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 22:15:00+09:00", "end": "2026-11-24 22:20:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T22:25:39+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 22:20:00+09:00", "end": "2026-11-24 22:25:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T22:25:54+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "connected"}
+{"ts": "2026-11-24T22:25:54+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "init"}
+{"ts": "2026-11-24T22:25:54+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "subscribe_sent"}
+{"ts": "2026-11-24T22:25:54+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "subscribe_sent"}
+{"ts": "2026-11-24T22:25:54+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "other"}
+{"ts": "2026-11-24T22:25:54+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "other"}
+{"ts": "2026-11-24T22:44:35+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 22:25:00+09:00", "end": "2026-11-24 22:30:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T22:44:35+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 22:30:00+09:00", "end": "2026-11-24 22:35:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T22:44:35+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 22:35:00+09:00", "end": "2026-11-24 22:40:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T22:45:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 22:40:00+09:00", "end": "2026-11-24 22:45:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T22:45:43+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "disconnected"}
+{"ts": "2026-11-24T22:45:43+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "reconnect_wait"}
+{"ts": "2026-11-24T22:46:13+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "connected"}
+{"ts": "2026-11-24T22:46:13+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "init"}
+{"ts": "2026-11-24T22:46:13+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "subscribe_sent"}
+{"ts": "2026-11-24T22:46:13+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "subscribe_sent"}
+{"ts": "2026-11-24T22:46:13+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "other"}
+{"ts": "2026-11-24T22:46:13+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "other"}
+{"ts": "2026-11-24T22:54:48+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 22:45:00+09:00", "end": "2026-11-24 22:50:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T22:55:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 22:50:00+09:00", "end": "2026-11-24 22:55:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T22:57:43+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "disconnected"}
+{"ts": "2026-11-24T22:57:43+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "reconnect_wait"}
+{"ts": "2026-11-24T23:02:00+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "connected"}
+{"ts": "2026-11-24T23:02:00+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "init"}
+{"ts": "2026-11-24T23:02:00+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "subscribe_sent"}
+{"ts": "2026-11-24T23:02:00+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "subscribe_sent"}
+{"ts": "2026-11-24T23:02:00+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "other"}
+{"ts": "2026-11-24T23:02:00+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "other"}
+{"ts": "2026-11-24T23:02:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 22:55:00+09:00", "end": "2026-11-24 23:00:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T23:08:55+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 23:00:00+09:00", "end": "2026-11-24 23:05:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T23:10:00+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 23:05:00+09:00", "end": "2026-11-24 23:10:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T23:10:03+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "disconnected"}
+{"ts": "2026-11-24T23:10:03+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "reconnect_wait"}
+{"ts": "2026-11-24T23:10:33+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "connected"}
+{"ts": "2026-11-24T23:10:33+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "init"}
+{"ts": "2026-11-24T23:10:33+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "subscribe_sent"}
+{"ts": "2026-11-24T23:10:33+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "subscribe_sent"}
+{"ts": "2026-11-24T23:10:33+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "other"}
+{"ts": "2026-11-24T23:10:33+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "other"}
+{"ts": "2026-11-24T23:20:49+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 23:10:00+09:00", "end": "2026-11-24 23:15:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T23:20:49+09:00", "type": "BAR", "symbol": "HGH27", "state": "", "start": "2026-11-24 23:15:00+09:00", "end": "2026-11-24 23:20:00+09:00", "regime": "HIGH_VOL"}
+{"ts": "2026-11-24T23:24:17+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "disconnected"}
+{"ts": "2026-11-24T23:24:17+09:00", "type": "WS_STATUS", "symbol": "HGH27", "state": "", "event": "reconnect_wait"}
+{"ts": "2026-11-24T23:34:48+09:00", "type": "RUN_END", "symbol": "HGH27", "state": "", "local_position_open": false, "locked": false}
+{"ts": "2026-11-24T23:34:48+09:00", "type": "ACCOUNT_CHECK", "symbol": "HGH27", "state": "", "position_qty": 0, "pending": 0}

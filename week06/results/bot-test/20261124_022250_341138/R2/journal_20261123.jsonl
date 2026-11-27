@@ -1,0 +1,4 @@
+{"ts": "2026-11-23T17:00:00+09:00", "type": "RUN_START", "symbol": "HGH27", "state": "", "environment": "bot-test", "scenario": "R2"}
+{"ts": "2026-11-23T17:00:00+09:00", "type": "HOLD", "symbol": "HGH27", "state": "", "reason": "HOLD_BUDGET", "regime": "TREND"}
+{"ts": "2026-11-23T17:00:00+09:00", "type": "ACCOUNT_CHECK", "symbol": "HGH27", "state": "", "position_qty": 0, "pending": 0}
+{"ts": "2026-11-23T17:00:00+09:00", "type": "BOT_TEST_PASS", "symbol": "HGH27", "state": "", "rule": "R2", "reason": "HOLD_BUDGET", "orders": 0, "position_qty": 0, "pending": 0}
